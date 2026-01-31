@@ -15,6 +15,7 @@ import arc.scene.event.InputListener;
 import arc.scene.event.Touchable;
 import arc.scene.ui.Dialog;
 import arc.scene.ui.Image;
+import arc.scene.ui.TextField;
 import arc.scene.style.TextureRegionDrawable;
 import arc.scene.ui.ScrollPane;
 import arc.scene.ui.TextButton;
@@ -104,7 +105,7 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
             for(int i = 0; i < 8; i++) table.pref(new SlotSetting(i, keySlotPrefix, "rbm.setting.slot"));
 
             table.pref(new HeaderSetting(Core.bundle.get("rbm.section.time")));
-            table.sliderPref(keyTimeMinutes, 0, 0, 240, 5, v -> v == 0 ? Core.bundle.get("rbm.setting.off") : Core.bundle.format("rbm.setting.minutes", v));
+            table.pref(new TimeMinutesSetting());
             for(int i = 0; i < 8; i++) table.pref(new SlotSetting(i, keyTimeSlotPrefix, "rbm.setting.timeslot"));
 
             table.pref(new HeaderSetting(Core.bundle.get("rbm.section.planet")));
@@ -193,6 +194,39 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
                     Core.settings.put(name, block == null ? "" : block.name);
                 })).width(140f).height(40f).padLeft(8f);
             }).width(prefWidth).padTop(6f);
+            table.row();
+        }
+    }
+
+    private class TimeMinutesSetting extends SettingsMenuDialog.SettingsTable.Setting{
+        public TimeMinutesSetting(){
+            super(keyTimeMinutes);
+        }
+
+        @Override
+        public void add(SettingsMenuDialog.SettingsTable table){
+            TextField field = new TextField();
+            field.setMessageText("0");
+            field.setFilter((text, c) -> Character.isDigit(c));
+
+            field.changed(() -> {
+                int minutes = Strings.parseInt(field.getText(), 0);
+                if(minutes < 0) minutes = 0;
+                Core.settings.put(name, minutes);
+            });
+
+            field.update(() -> {
+                if(Core.scene.getKeyboardFocus() == field) return;
+                String value = Integer.toString(Core.settings.getInt(name, 0));
+                if(!value.equals(field.getText())){
+                    field.setText(value);
+                }
+            });
+
+            Table prefTable = table.table().left().padTop(3f).get();
+            prefTable.add(field).width(140f);
+            prefTable.label(() -> title);
+            addDesc(prefTable);
             table.row();
         }
     }
