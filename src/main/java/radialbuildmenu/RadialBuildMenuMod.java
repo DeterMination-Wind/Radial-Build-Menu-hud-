@@ -53,6 +53,10 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
     private static final int slotsPerRing = 8;
     private static final int maxSlots = 16;
 
+    private static final String planetErekir = "erekir";
+    private static final String planetSerpulo = "serpulo";
+    private static final String planetSun = "sun";
+
     private static final String keyEnabled = "rbm-enabled";
     private static final String keyHudScale = "rbm-hudscale";
     private static final String keyHudAlpha = "rbm-hudalpha";
@@ -61,11 +65,16 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
     private static final String keyHudColor = "rbm-hudcolor";
     private static final String keyCenterScreen = "rbm-center-screen";
     private static final String keyTimeMinutes = "rbm-time-minutes";
-    private static final String keyPlanetName = "rbm-planet";
 
     private static final String keySlotPrefix = "rbm-slot-";
     private static final String keyTimeSlotPrefix = "rbm-time-slot-";
-    private static final String keyPlanetSlotPrefix = "rbm-planet-slot-";
+    private static final String keyTimeErekirSlotPrefix = "rbm-time-erekir-slot-";
+    private static final String keyTimeSerpuloSlotPrefix = "rbm-time-serpulo-slot-";
+    private static final String keyTimeSunSlotPrefix = "rbm-time-sun-slot-";
+
+    private static final String keyPlanetErekirSlotPrefix = "rbm-planet-erekir-slot-";
+    private static final String keyPlanetSerpuloSlotPrefix = "rbm-planet-serpulo-slot-";
+    private static final String keyPlanetSunSlotPrefix = "rbm-planet-sun-slot-";
 
     private static final String[] defaultSlotNames = {
         "conveyor",
@@ -99,12 +108,17 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         Core.settings.defaults(keyHudColor, defaultHudColorHex());
         Core.settings.defaults(keyCenterScreen, false);
         Core.settings.defaults(keyTimeMinutes, 0);
-        Core.settings.defaults(keyPlanetName, "");
         for(int i = 0; i < maxSlots; i++){
             String def = defaultSlotName(i);
             Core.settings.defaults(keySlotPrefix + i, def);
             Core.settings.defaults(keyTimeSlotPrefix + i, def);
-            Core.settings.defaults(keyPlanetSlotPrefix + i, def);
+            // planet-specific overrides are empty by default
+            Core.settings.defaults(keyTimeErekirSlotPrefix + i, "");
+            Core.settings.defaults(keyTimeSerpuloSlotPrefix + i, "");
+            Core.settings.defaults(keyTimeSunSlotPrefix + i, "");
+            Core.settings.defaults(keyPlanetErekirSlotPrefix + i, "");
+            Core.settings.defaults(keyPlanetSerpuloSlotPrefix + i, "");
+            Core.settings.defaults(keyPlanetSunSlotPrefix + i, "");
         }
     }
 
@@ -129,10 +143,20 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
             table.pref(new HeaderSetting(Core.bundle.get("rbm.section.time")));
             table.pref(new TimeMinutesSetting());
             for(int i = 0; i < maxSlots; i++) table.pref(new SlotSetting(i, keyTimeSlotPrefix, "rbm.setting.timeslot"));
+            table.pref(new HeaderSetting(Core.bundle.get("rbm.section.time.erekir")));
+            for(int i = 0; i < maxSlots; i++) table.pref(new SlotSetting(i, keyTimeErekirSlotPrefix, "rbm.setting.timeslot.erekir"));
+            table.pref(new HeaderSetting(Core.bundle.get("rbm.section.time.serpulo")));
+            for(int i = 0; i < maxSlots; i++) table.pref(new SlotSetting(i, keyTimeSerpuloSlotPrefix, "rbm.setting.timeslot.serpulo"));
+            table.pref(new HeaderSetting(Core.bundle.get("rbm.section.time.sun")));
+            for(int i = 0; i < maxSlots; i++) table.pref(new SlotSetting(i, keyTimeSunSlotPrefix, "rbm.setting.timeslot.sun"));
 
             table.pref(new HeaderSetting(Core.bundle.get("rbm.section.planet")));
-            table.pref(new PlanetSetting());
-            for(int i = 0; i < maxSlots; i++) table.pref(new SlotSetting(i, keyPlanetSlotPrefix, "rbm.setting.planetslot"));
+            table.pref(new HeaderSetting(Core.bundle.get("rbm.section.planet.erekir")));
+            for(int i = 0; i < maxSlots; i++) table.pref(new SlotSetting(i, keyPlanetErekirSlotPrefix, "rbm.setting.planetslot.erekir"));
+            table.pref(new HeaderSetting(Core.bundle.get("rbm.section.planet.serpulo")));
+            for(int i = 0; i < maxSlots; i++) table.pref(new SlotSetting(i, keyPlanetSerpuloSlotPrefix, "rbm.setting.planetslot.serpulo"));
+            table.pref(new HeaderSetting(Core.bundle.get("rbm.section.planet.sun")));
+            for(int i = 0; i < maxSlots; i++) table.pref(new SlotSetting(i, keyPlanetSunSlotPrefix, "rbm.setting.planetslot.sun"));
 
             table.pref(new HeaderSetting(Core.bundle.get("rbm.section.io")));
             table.pref(new IoSetting());
@@ -363,52 +387,6 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         }
     }
 
-    private class PlanetSetting extends SettingsMenuDialog.SettingsTable.Setting{
-        public PlanetSetting(){
-            super(keyPlanetName);
-            title = Core.bundle.get("rbm.setting.planet");
-        }
-
-        @Override
-        public void add(SettingsMenuDialog.SettingsTable table){
-            float prefWidth = Math.min(Core.graphics.getWidth() / 1.2f, 560f);
-            table.table(Tex.button, t -> {
-                t.left().margin(10f);
-
-                t.add(title).width(120f).left();
-                t.table(info -> {
-                    info.left();
-
-                    Image icon = info.image(Tex.clear).size(32f).padRight(8f).get();
-                    icon.setScaling(Scaling.fit);
-
-                    info.labelWrap(() -> {
-                        Planet planet = selectedPlanet();
-                        return planet == null ? Core.bundle.get("rbm.setting.planet.none") : planet.localizedName;
-                    }).left().growX().fillX().minWidth(0f);
-
-                    final Planet[] lastPlanet = {null};
-                    info.update(() -> {
-                        Planet planet = selectedPlanet();
-                        if(planet == lastPlanet[0]) return;
-                        lastPlanet[0] = planet;
-                        icon.setDrawable(planet == null ? Tex.clear : new TextureRegionDrawable(planet.uiIcon));
-                    });
-                }).left().growX().fillX().minWidth(0f);
-
-                t.button("@rbm.setting.set", Styles.flatt, () -> showPlanetSelectDialog(planet -> {
-                    Core.settings.put(keyPlanetName, planet == null ? "" : planet.name);
-                })).width(140f).height(40f).padLeft(8f);
-
-                t.button("@rbm.setting.clear", Styles.flatt, () -> Core.settings.put(keyPlanetName, ""))
-                    .width(100f)
-                    .height(40f)
-                    .padLeft(6f);
-            }).width(prefWidth).padTop(6f);
-            table.row();
-        }
-    }
-
     private void showBlockSelectDialog(arc.func.Cons<Block> consumer){
         BaseDialog dialog = new BaseDialog("@rbm.selectblock.title");
         dialog.addCloseButton();
@@ -475,76 +453,6 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         dialog.show();
     }
 
-    private void showPlanetSelectDialog(arc.func.Cons<Planet> consumer){
-        BaseDialog dialog = new BaseDialog("@rbm.selectplanet.title");
-        dialog.addCloseButton();
-
-        String[] searchText = {""};
-
-        Table list = new Table();
-        list.top().left();
-        list.defaults().growX().height(54f).pad(2f);
-
-        ScrollPane pane = new ScrollPane(list);
-        pane.setFadeScrollBars(false);
-
-        Runnable rebuild = () -> {
-            list.clearChildren();
-
-            list.button("@rbm.selectplanet.none", Styles.flatt, () -> {
-                dialog.hide();
-                consumer.get(null);
-            }).row();
-
-            String query = searchText[0] == null ? "" : searchText[0].trim().toLowerCase(Locale.ROOT);
-
-            for(Planet planet : content.planets()){
-                if(planet == null) continue;
-                if(!planet.visible) continue;
-                if(!planet.accessible) continue;
-
-                if(!query.isEmpty()){
-                    String name = planet.name.toLowerCase(Locale.ROOT);
-                    String localized = Strings.stripColors(planet.localizedName).toLowerCase(Locale.ROOT);
-                    if(!name.contains(query) && !localized.contains(query)){
-                        continue;
-                    }
-                }
-
-                list.button(b -> {
-                    b.left();
-                    b.image(planet.uiIcon).size(32f).padRight(8f);
-                    b.add(planet.localizedName).left().growX().wrap();
-                    b.add(planet.name).color(Color.gray).padLeft(8f).right();
-                }, Styles.flatt, () -> {
-                    dialog.hide();
-                    consumer.get(planet);
-                }).row();
-            }
-        };
-
-        dialog.cont.table(t -> {
-            t.left();
-            t.image(mindustry.gen.Icon.zoom).padRight(8f);
-            t.field("", text -> {
-                searchText[0] = text;
-                rebuild.run();
-            }).growX().get().setMessageText("@players.search");
-        }).growX().padBottom(6f);
-
-        dialog.cont.row();
-        dialog.cont.add(pane).grow().minHeight(320f);
-
-        dialog.shown(rebuild);
-        dialog.show();
-    }
-
-    private Planet selectedPlanet(){
-        String name = Core.settings.getString(keyPlanetName, "");
-        if(name == null || name.trim().isEmpty()) return null;
-        return content.planet(name.trim());
-    }
-
     private static String defaultSlotName(int slot){
         if(slot >= 0 && slot < defaultSlotNames.length) return defaultSlotNames[slot];
         return "";
@@ -563,27 +471,54 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         return content.block(name);
     }
 
-    private String resolveSlotPrefix(){
-        if(!state.isGame() || state.rules.editor) return keySlotPrefix;
-
-        Planet current = state.getPlanet();
-        String wanted = Core.settings.getString(keyPlanetName, "");
-        if(current != null && wanted != null){
-            wanted = wanted.trim();
-            if(!wanted.isEmpty() && wanted.equals(current.name)){
-                return keyPlanetSlotPrefix;
-            }
-        }
-
+    private boolean timeRuleActive(){
+        if(!state.isGame() || state.rules.editor) return false;
         int minutes = Core.settings.getInt(keyTimeMinutes, 0);
-        if(minutes > 0){
-            double currentMinutes = state.tick / 60.0 / 60.0;
-            if(currentMinutes >= minutes){
-                return keyTimeSlotPrefix;
+        if(minutes <= 0) return false;
+        double currentMinutes = state.tick / 60.0 / 60.0;
+        return currentMinutes >= minutes;
+    }
+
+    private String currentPlanetName(){
+        if(!state.isGame()) return "";
+        Planet planet = state.getPlanet();
+        return planet == null ? "" : planet.name;
+    }
+
+    private String planetPrefix(String planetName){
+        if(planetErekir.equals(planetName)) return keyPlanetErekirSlotPrefix;
+        if(planetSerpulo.equals(planetName)) return keyPlanetSerpuloSlotPrefix;
+        if(planetSun.equals(planetName)) return keyPlanetSunSlotPrefix;
+        return "";
+    }
+
+    private String timePlanetPrefix(String planetName){
+        if(planetErekir.equals(planetName)) return keyTimeErekirSlotPrefix;
+        if(planetSerpulo.equals(planetName)) return keyTimeSerpuloSlotPrefix;
+        if(planetSun.equals(planetName)) return keyTimeSunSlotPrefix;
+        return "";
+    }
+
+    private Block contextSlotBlock(int slot){
+        String planet = currentPlanetName();
+
+        if(timeRuleActive()){
+            String tp = timePlanetPrefix(planet);
+            if(!tp.isEmpty()){
+                Block b = slotBlock(tp, slot);
+                if(b != null) return b;
+            }
+            Block time = slotBlock(keyTimeSlotPrefix, slot);
+            if(time != null) return time;
+        }else{
+            String pp = planetPrefix(planet);
+            if(!pp.isEmpty()){
+                Block b = slotBlock(pp, slot);
+                if(b != null) return b;
             }
         }
 
-        return keySlotPrefix;
+        return slotBlock(keySlotPrefix, slot);
     }
 
     private static String defaultHudColorHex(){
@@ -676,11 +611,16 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         root.put("hudColor", normalizeHex(Core.settings.getString(keyHudColor, defaultHudColorHex())));
 
         root.put("timeMinutes", Core.settings.getInt(keyTimeMinutes, 0));
-        root.put("planet", Core.settings.getString(keyPlanetName, ""));
 
         root.put("slots", exportSlots(keySlotPrefix));
         root.put("timeSlots", exportSlots(keyTimeSlotPrefix));
-        root.put("planetSlots", exportSlots(keyPlanetSlotPrefix));
+        root.put("timeSlotsErekir", exportSlots(keyTimeErekirSlotPrefix));
+        root.put("timeSlotsSerpulo", exportSlots(keyTimeSerpuloSlotPrefix));
+        root.put("timeSlotsSun", exportSlots(keyTimeSunSlotPrefix));
+
+        root.put("planetSlotsErekir", exportSlots(keyPlanetErekirSlotPrefix));
+        root.put("planetSlotsSerpulo", exportSlots(keyPlanetSerpuloSlotPrefix));
+        root.put("planetSlotsSun", exportSlots(keyPlanetSunSlotPrefix));
 
         return root.toString(Jformat.plain);
     }
@@ -706,14 +646,16 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
             if(root.has("hudColor")) Core.settings.put(keyHudColor, normalizeHex(root.getString("hudColor", defaultHudColorHex())));
 
             if(root.has("timeMinutes")) Core.settings.put(keyTimeMinutes, Math.max(0, root.getInt("timeMinutes", 0)));
-            if(root.has("planet")){
-                String planet = root.getString("planet", "");
-                Core.settings.put(keyPlanetName, planet == null ? "" : planet);
-            }
 
             if(root.has("slots")) importSlots(root.get("slots"), keySlotPrefix);
             if(root.has("timeSlots")) importSlots(root.get("timeSlots"), keyTimeSlotPrefix);
-            if(root.has("planetSlots")) importSlots(root.get("planetSlots"), keyPlanetSlotPrefix);
+            if(root.has("timeSlotsErekir")) importSlots(root.get("timeSlotsErekir"), keyTimeErekirSlotPrefix);
+            if(root.has("timeSlotsSerpulo")) importSlots(root.get("timeSlotsSerpulo"), keyTimeSerpuloSlotPrefix);
+            if(root.has("timeSlotsSun")) importSlots(root.get("timeSlotsSun"), keyTimeSunSlotPrefix);
+
+            if(root.has("planetSlotsErekir")) importSlots(root.get("planetSlotsErekir"), keyPlanetErekirSlotPrefix);
+            if(root.has("planetSlotsSerpulo")) importSlots(root.get("planetSlotsSerpulo"), keyPlanetSerpuloSlotPrefix);
+            if(root.has("planetSlotsSun")) importSlots(root.get("planetSlotsSun"), keyPlanetSunSlotPrefix);
 
             return true;
         }catch(Throwable t){
@@ -752,7 +694,6 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         private float centerX, centerY;
         private int hovered = -1;
         private final Block[] slots = new Block[maxSlots];
-        private String slotsPrefix = keySlotPrefix;
         private boolean outerActive;
         private final Color hudColor = new Color();
         private final int[] innerIndices = new int[slotsPerRing];
@@ -922,9 +863,8 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
                 centerY = Core.input.mouseY();
             }
 
-            slotsPrefix = mod.resolveSlotPrefix();
             for(int i = 0; i < slots.length; i++){
-                slots[i] = mod.slotBlock(slotsPrefix, i);
+                slots[i] = mod.contextSlotBlock(i);
             }
 
             rebuildActiveSlotLists();
