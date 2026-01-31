@@ -1,0 +1,22 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create/Update GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "dist/radial-build-menu.zip"
+          allowUpdates: true
+          replacesArtifacts: true
+          draft: false
