@@ -1,0 +1,19 @@
+plugins{
+    id "java"
+}
+
+group = "radialbuildmenu"
+version = "0.1.0"
+
+dependencies{
+    // Build against this Mindustry source checkout.
+    compileOnly project(":core")
+}
+
+tasks.withType(JavaCompile).configureEach{
+    options.encoding = "UTF-8"
+}
+
+jar{
+    archiveFileName = "${project.name}.zip"
+}
