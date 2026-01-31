@@ -15,6 +15,7 @@ import arc.scene.event.InputListener;
 import arc.scene.event.Touchable;
 import arc.scene.ui.Dialog;
 import arc.scene.ui.Image;
+import arc.scene.ui.TextArea;
 import arc.scene.ui.TextField;
 import arc.scene.style.TextureRegionDrawable;
 import arc.scene.ui.ScrollPane;
@@ -24,6 +25,8 @@ import arc.scene.ui.layout.Scl;
 import arc.util.Scaling;
 import arc.util.Strings;
 import arc.util.Time;
+import arc.util.serialization.Jval;
+import arc.util.serialization.Jval.Jformat;
 import mindustry.game.EventType.ClientLoadEvent;
 import mindustry.game.EventType.WorldLoadEvent;
 import mindustry.gen.Tex;
@@ -47,9 +50,15 @@ import static mindustry.Vars.control;
 public class RadialBuildMenuMod extends mindustry.mod.Mod{
     private static final String overlayName = "rbm-overlay";
 
+    private static final int slotsPerRing = 8;
+    private static final int maxSlots = 16;
+
     private static final String keyEnabled = "rbm-enabled";
     private static final String keyHudScale = "rbm-hudscale";
     private static final String keyHudAlpha = "rbm-hudalpha";
+    private static final String keyInnerRadius = "rbm-inner-radius";
+    private static final String keyOuterRadius = "rbm-outer-radius";
+    private static final String keyHudColor = "rbm-hudcolor";
     private static final String keyTimeMinutes = "rbm-time-minutes";
     private static final String keyPlanetName = "rbm-planet";
 
@@ -84,12 +93,16 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         Core.settings.defaults(keyEnabled, true);
         Core.settings.defaults(keyHudScale, 100);
         Core.settings.defaults(keyHudAlpha, 100);
+        Core.settings.defaults(keyInnerRadius, 80);
+        Core.settings.defaults(keyOuterRadius, 140);
+        Core.settings.defaults(keyHudColor, defaultHudColorHex());
         Core.settings.defaults(keyTimeMinutes, 0);
         Core.settings.defaults(keyPlanetName, "");
-        for(int i = 0; i < defaultSlotNames.length; i++){
-            Core.settings.defaults(keySlotPrefix + i, defaultSlotNames[i]);
-            Core.settings.defaults(keyTimeSlotPrefix + i, defaultSlotNames[i]);
-            Core.settings.defaults(keyPlanetSlotPrefix + i, defaultSlotNames[i]);
+        for(int i = 0; i < maxSlots; i++){
+            String def = defaultSlotName(i);
+            Core.settings.defaults(keySlotPrefix + i, def);
+            Core.settings.defaults(keyTimeSlotPrefix + i, def);
+            Core.settings.defaults(keyPlanetSlotPrefix + i, def);
         }
     }
 
@@ -98,19 +111,28 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
 
         ui.settings.addCategory("@rbm.category", table -> {
             table.checkPref(keyEnabled, true);
+            table.pref(new HotkeySetting());
+
+            table.pref(new HeaderSetting(Core.bundle.get("rbm.section.appearance")));
             table.sliderPref(keyHudScale, 100, 50, 200, 5, v -> v + "%");
             table.sliderPref(keyHudAlpha, 100, 0, 100, 5, v -> v + "%");
-            table.pref(new HotkeySetting());
+            table.sliderPref(keyInnerRadius, 80, 40, 200, 5, v -> v + "px");
+            table.sliderPref(keyOuterRadius, 140, 60, 360, 5, v -> v + "px");
+            table.pref(new HudColorSetting());
+
             table.pref(new HeaderSetting(Core.bundle.get("rbm.section.base")));
-            for(int i = 0; i < 8; i++) table.pref(new SlotSetting(i, keySlotPrefix, "rbm.setting.slot"));
+            for(int i = 0; i < maxSlots; i++) table.pref(new SlotSetting(i, keySlotPrefix, "rbm.setting.slot"));
 
             table.pref(new HeaderSetting(Core.bundle.get("rbm.section.time")));
             table.pref(new TimeMinutesSetting());
-            for(int i = 0; i < 8; i++) table.pref(new SlotSetting(i, keyTimeSlotPrefix, "rbm.setting.timeslot"));
+            for(int i = 0; i < maxSlots; i++) table.pref(new SlotSetting(i, keyTimeSlotPrefix, "rbm.setting.timeslot"));
 
             table.pref(new HeaderSetting(Core.bundle.get("rbm.section.planet")));
             table.pref(new PlanetSetting());
-            for(int i = 0; i < 8; i++) table.pref(new SlotSetting(i, keyPlanetSlotPrefix, "rbm.setting.planetslot"));
+            for(int i = 0; i < maxSlots; i++) table.pref(new SlotSetting(i, keyPlanetSlotPrefix, "rbm.setting.planetslot"));
+
+            table.pref(new HeaderSetting(Core.bundle.get("rbm.section.io")));
+            table.pref(new IoSetting());
         });
     }
 
@@ -198,6 +220,55 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         }
     }
 
+    private class HudColorSetting extends SettingsMenuDialog.SettingsTable.Setting{
+        public HudColorSetting(){
+            super(keyHudColor);
+            title = Core.bundle.get("setting.rbm-hudcolor.name");
+        }
+
+        @Override
+        public void add(SettingsMenuDialog.SettingsTable table){
+            float prefWidth = Math.min(Core.graphics.getWidth() / 1.2f, 560f);
+            table.table(Tex.button, t -> {
+                t.left().margin(10f);
+                t.add(title).width(120f).left();
+
+                Image preview = new Image(Tex.whiteui);
+                preview.setScaling(Scaling.stretch);
+                preview.setColor(readHudColor());
+                t.add(preview).size(22f).padRight(8f);
+
+                TextField field = new TextField();
+                field.setMessageText(defaultHudColorHex());
+                field.setText(Core.settings.getString(keyHudColor, defaultHudColorHex()));
+                field.setFilter((text, c) -> isHexChar(c));
+
+                field.changed(() -> {
+                    String hex = normalizeHex(field.getText());
+                    Core.settings.put(keyHudColor, hex);
+                    preview.setColor(readHudColor());
+                });
+
+                field.update(() -> {
+                    if(Core.scene.getKeyboardFocus() == field) return;
+                    String value = Core.settings.getString(keyHudColor, defaultHudColorHex());
+                    if(value == null) value = defaultHudColorHex();
+                    if(!value.equals(field.getText())){
+                        field.setText(value);
+                    }
+                    preview.setColor(readHudColor());
+                });
+
+                t.add(field).width(160f);
+            }).width(prefWidth).padTop(6f);
+            table.row();
+        }
+
+        private boolean isHexChar(char c){
+            return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+        }
+    }
+
     private class TimeMinutesSetting extends SettingsMenuDialog.SettingsTable.Setting{
         public TimeMinutesSetting(){
             super(keyTimeMinutes);
@@ -227,6 +298,28 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
             prefTable.add(field).width(140f);
             prefTable.label(() -> title);
             addDesc(prefTable);
+            table.row();
+        }
+    }
+
+    private class IoSetting extends SettingsMenuDialog.SettingsTable.Setting{
+        public IoSetting(){
+            super("rbm-io");
+            title = Core.bundle.get("rbm.io.title");
+        }
+
+        @Override
+        public void add(SettingsMenuDialog.SettingsTable table){
+            float prefWidth = Math.min(Core.graphics.getWidth() / 1.2f, 560f);
+            table.table(Tex.button, t -> {
+                t.left().margin(10f);
+
+                t.add(title).width(120f).left();
+                t.button("@rbm.io.export", Styles.flatt, RadialBuildMenuMod.this::showExportDialog)
+                    .width(160f).height(40f).padLeft(8f);
+                t.button("@rbm.io.import", Styles.flatt, RadialBuildMenuMod.this::showImportDialog)
+                    .width(160f).height(40f).padLeft(8f);
+            }).width(prefWidth).padTop(6f);
             table.row();
         }
     }
@@ -413,10 +506,21 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         return content.planet(name.trim());
     }
 
+    private static String defaultSlotName(int slot){
+        if(slot >= 0 && slot < defaultSlotNames.length) return defaultSlotNames[slot];
+        return "";
+    }
+
+    private String slotName(String prefix, int slot){
+        if(slot < 0 || slot >= maxSlots) return "";
+        String value = Core.settings.getString(prefix + slot, defaultSlotName(slot));
+        if(value == null) return "";
+        return value.trim();
+    }
+
     private Block slotBlock(String prefix, int slot){
-        if(slot < 0 || slot >= 8) return null;
-        String name = Core.settings.getString(prefix + slot, defaultSlotNames[slot]);
-        if(name == null || name.trim().isEmpty()) return null;
+        String name = slotName(prefix, slot);
+        if(name.isEmpty()) return null;
         return content.block(name);
     }
 
@@ -443,6 +547,153 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         return keySlotPrefix;
     }
 
+    private static String defaultHudColorHex(){
+        int r = Math.min(255, Math.max(0, (int)(Pal.accent.r * 255f)));
+        int g = Math.min(255, Math.max(0, (int)(Pal.accent.g * 255f)));
+        int b = Math.min(255, Math.max(0, (int)(Pal.accent.b * 255f)));
+        return String.format(Locale.ROOT, "%02x%02x%02x", r, g, b);
+    }
+
+    private static String normalizeHex(String text){
+        if(text == null) return defaultHudColorHex();
+        String hex = text.trim();
+        if(hex.startsWith("#")) hex = hex.substring(1);
+        hex = hex.toLowerCase(Locale.ROOT);
+        if(hex.length() > 6) hex = hex.substring(0, 6);
+        while(hex.length() < 6) hex += "0";
+        for(int i = 0; i < hex.length(); i++){
+            char c = hex.charAt(i);
+            boolean ok = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+            if(!ok) return defaultHudColorHex();
+        }
+        return hex;
+    }
+
+    private Color readHudColor(){
+        String hex = normalizeHex(Core.settings.getString(keyHudColor, defaultHudColorHex()));
+        try{
+            return Color.valueOf(hex);
+        }catch(Throwable t){
+            return Pal.accent;
+        }
+    }
+
+    private void showExportDialog(){
+        String json = exportConfig();
+
+        BaseDialog dialog = new BaseDialog("@rbm.io.export");
+        dialog.addCloseButton();
+
+        TextArea area = new TextArea(json);
+        area.setDisabled(true);
+        area.setPrefRows(12);
+
+        ScrollPane pane = new ScrollPane(area);
+        pane.setFadeScrollBars(false);
+
+        dialog.cont.add(pane).grow().minHeight(220f);
+        dialog.cont.row();
+        dialog.cont.button("@rbm.io.copy", Styles.flatt, () -> {
+            Core.app.setClipboardText(json);
+            ui.showInfoFade("@rbm.io.copied");
+        }).height(44f).growX().padTop(8f);
+
+        dialog.show();
+    }
+
+    private void showImportDialog(){
+        BaseDialog dialog = new BaseDialog("@rbm.io.import");
+        dialog.addCloseButton();
+
+        TextArea area = new TextArea("");
+        area.setMessageText(Core.bundle.get("rbm.io.pastehere"));
+        area.setPrefRows(12);
+
+        ScrollPane pane = new ScrollPane(area);
+        pane.setFadeScrollBars(false);
+
+        dialog.cont.add(pane).grow().minHeight(220f);
+        dialog.cont.row();
+        dialog.cont.button("@rbm.io.import.apply", Styles.flatt, () -> {
+            if(importConfig(area.getText())){
+                ui.showInfoFade("@rbm.io.import.success");
+                dialog.hide();
+            }else{
+                ui.showInfoFade("@rbm.io.import.invalid");
+            }
+        }).height(44f).growX().padTop(8f);
+
+        dialog.show();
+    }
+
+    private String exportConfig(){
+        Jval root = Jval.newObject();
+        root.put("schema", 1);
+
+        root.put("hudScale", Core.settings.getInt(keyHudScale, 100));
+        root.put("hudAlpha", Core.settings.getInt(keyHudAlpha, 100));
+        root.put("innerRadius", Core.settings.getInt(keyInnerRadius, 80));
+        root.put("outerRadius", Core.settings.getInt(keyOuterRadius, 140));
+        root.put("hudColor", normalizeHex(Core.settings.getString(keyHudColor, defaultHudColorHex())));
+
+        root.put("timeMinutes", Core.settings.getInt(keyTimeMinutes, 0));
+        root.put("planet", Core.settings.getString(keyPlanetName, ""));
+
+        root.put("slots", exportSlots(keySlotPrefix));
+        root.put("timeSlots", exportSlots(keyTimeSlotPrefix));
+        root.put("planetSlots", exportSlots(keyPlanetSlotPrefix));
+
+        return root.toString(Jformat.plain);
+    }
+
+    private Jval exportSlots(String prefix){
+        Jval arr = Jval.newArray();
+        for(int i = 0; i < maxSlots; i++){
+            arr.add(slotName(prefix, i));
+        }
+        return arr;
+    }
+
+    private boolean importConfig(String text){
+        if(text == null) return false;
+        try{
+            Jval root = Jval.read(text);
+            if(root == null || !root.isObject()) return false;
+
+            if(root.has("hudScale")) Core.settings.put(keyHudScale, root.getInt("hudScale", 100));
+            if(root.has("hudAlpha")) Core.settings.put(keyHudAlpha, root.getInt("hudAlpha", 100));
+            if(root.has("innerRadius")) Core.settings.put(keyInnerRadius, root.getInt("innerRadius", 80));
+            if(root.has("outerRadius")) Core.settings.put(keyOuterRadius, root.getInt("outerRadius", 140));
+            if(root.has("hudColor")) Core.settings.put(keyHudColor, normalizeHex(root.getString("hudColor", defaultHudColorHex())));
+
+            if(root.has("timeMinutes")) Core.settings.put(keyTimeMinutes, Math.max(0, root.getInt("timeMinutes", 0)));
+            if(root.has("planet")){
+                String planet = root.getString("planet", "");
+                Core.settings.put(keyPlanetName, planet == null ? "" : planet);
+            }
+
+            if(root.has("slots")) importSlots(root.get("slots"), keySlotPrefix);
+            if(root.has("timeSlots")) importSlots(root.get("timeSlots"), keyTimeSlotPrefix);
+            if(root.has("planetSlots")) importSlots(root.get("planetSlots"), keyPlanetSlotPrefix);
+
+            return true;
+        }catch(Throwable t){
+            return false;
+        }
+    }
+
+    private void importSlots(Jval arr, String prefix){
+        if(arr == null || !arr.isArray()) return;
+        int size = Math.min(arr.asArray().size, maxSlots);
+        for(int i = 0; i < size; i++){
+            String value = arr.asArray().get(i).asString();
+            Core.settings.put(prefix + i, (value == null ? "" : value).trim());
+        }
+        for(int i = size; i < maxSlots; i++){
+            Core.settings.put(prefix + i, "");
+        }
+    }
+
     private void ensureOverlayAttached(){
         if(mobile) return;
         if(ui == null || ui.hudGroup == null) return;
@@ -461,8 +712,10 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         private boolean active;
         private float centerX, centerY;
         private int hovered = -1;
-        private final Block[] slots = new Block[8];
+        private final Block[] slots = new Block[maxSlots];
         private String slotsPrefix = keySlotPrefix;
+        private boolean outerActive;
+        private final Color hudColor = new Color();
 
         public RadialHud(RadialBuildMenuMod mod){
             this.mod = mod;
@@ -511,24 +764,35 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
             float scale = Mathf.clamp(Core.settings.getInt(keyHudScale, 100) / 100f, 0.1f, 5f);
 
             float iconSize = Scl.scl(46f) * scale;
-            float radius = Scl.scl(80f) * scale;
+            float innerRadius = Scl.scl(Core.settings.getInt(keyInnerRadius, 80)) * scale;
+            float outerRadius = Scl.scl(Core.settings.getInt(keyOuterRadius, 140)) * scale;
+            outerRadius = Math.max(outerRadius, innerRadius + iconSize * 1.15f);
             float slotBack = iconSize / 2f + Scl.scl(10f) * scale;
 
             Draw.z(1000f);
 
+            hudColor.set(mod.readHudColor());
+
             // soft background disc around the cursor
             Draw.color(0f, 0f, 0f, 0.18f * alpha);
-            Fill.circle(centerX, centerY, radius + iconSize * 0.75f);
+            float backRadius = (outerActive ? outerRadius : innerRadius) + iconSize * 0.75f;
+            Fill.circle(centerX, centerY, backRadius);
 
             // ring
-            Draw.color(Pal.accent, 0.65f * alpha);
+            Draw.color(hudColor, 0.65f * alpha);
             Lines.stroke(Scl.scl(2f) * scale);
-            Lines.circle(centerX, centerY, radius);
+            Lines.circle(centerX, centerY, innerRadius);
+            if(outerActive){
+                Lines.circle(centerX, centerY, outerRadius);
+            }
 
-            for(int i = 0; i < 8; i++){
-                float angle = 90f - i * 45f;
-                float px = centerX + Mathf.cosDeg(angle) * radius;
-                float py = centerY + Mathf.sinDeg(angle) * radius;
+            int slotCount = outerActive ? maxSlots : slotsPerRing;
+            for(int i = 0; i < slotCount; i++){
+                float ringRadius = (i < slotsPerRing ? innerRadius : outerRadius);
+                int ringIndex = i % slotsPerRing;
+                float angle = 90f - ringIndex * 45f;
+                float px = centerX + Mathf.cosDeg(angle) * ringRadius;
+                float py = centerY + Mathf.sinDeg(angle) * ringRadius;
 
                 boolean isHovered = i == hovered;
 
@@ -537,7 +801,7 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
                 Fill.circle(px, py, slotBack);
 
                 // slot border
-                Draw.color(isHovered ? Pal.accent : Color.gray, (isHovered ? 1f : 0.35f) * alpha);
+                Draw.color(isHovered ? hudColor : Color.gray, (isHovered ? 1f : 0.35f) * alpha);
                 Lines.stroke(Scl.scl(isHovered ? 2.4f : 1.6f) * scale);
                 Lines.circle(px, py, slotBack);
 
@@ -592,13 +856,23 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
                 slots[i] = mod.slotBlock(slotsPrefix, i);
             }
 
+            outerActive = false;
+            for(int i = slotsPerRing; i < maxSlots; i++){
+                if(!mod.slotName(slotsPrefix, i).isEmpty()){
+                    outerActive = true;
+                    break;
+                }
+            }
+
             hovered = findHovered();
         }
 
         private int findHovered(){
             float scale = Mathf.clamp(Core.settings.getInt(keyHudScale, 100) / 100f, 0.1f, 5f);
             float iconSize = Scl.scl(46f) * scale;
-            float radius = Scl.scl(80f) * scale;
+            float innerRadius = Scl.scl(Core.settings.getInt(keyInnerRadius, 80)) * scale;
+            float outerRadius = Scl.scl(Core.settings.getInt(keyOuterRadius, 140)) * scale;
+            outerRadius = Math.max(outerRadius, innerRadius + iconSize * 1.15f);
             float hit = iconSize / 2f + Scl.scl(12f) * scale;
             float hit2 = hit * hit;
 
@@ -608,10 +882,13 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
             int best = -1;
             float bestDst2 = hit2;
 
-            for(int i = 0; i < 8; i++){
-                float angle = 90f - i * 45f;
-                float px = centerX + Mathf.cosDeg(angle) * radius;
-                float py = centerY + Mathf.sinDeg(angle) * radius;
+            int slotCount = outerActive ? maxSlots : slotsPerRing;
+            for(int i = 0; i < slotCount; i++){
+                float ringRadius = (i < slotsPerRing ? innerRadius : outerRadius);
+                int ringIndex = i % slotsPerRing;
+                float angle = 90f - ringIndex * 45f;
+                float px = centerX + Mathf.cosDeg(angle) * ringRadius;
+                float py = centerY + Mathf.sinDeg(angle) * ringRadius;
                 float dx = mx - px;
                 float dy = my - py;
                 float dst2 = dx * dx + dy * dy;
@@ -621,7 +898,28 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
                 }
             }
 
-            return best;
+            if(best != -1) return best;
+
+            float dx = mx - centerX;
+            float dy = my - centerY;
+            float deadzone = iconSize * 0.35f;
+            if(dx * dx + dy * dy < deadzone * deadzone) return -1;
+
+            int sector = sectorIndex(dx, dy);
+            int candidate = (outerActive ? slotsPerRing + sector : sector);
+            if(candidate < 0 || candidate >= slotCount) return -1;
+            return slots[candidate] == null ? -1 : candidate;
+        }
+
+        private int sectorIndex(float dx, float dy){
+            float angle = Mathf.atan2(dy, dx) * Mathf.radDeg;
+            if(angle < 0f) angle += 360f;
+
+            float rotated = 90f - angle;
+            rotated = ((rotated % 360f) + 360f) % 360f;
+            int idx = (int)Math.floor((rotated + 22.5f) / 45f) % 8;
+            if(idx < 0) idx += 8;
+            return idx;
         }
 
         private void commitSelection(){
