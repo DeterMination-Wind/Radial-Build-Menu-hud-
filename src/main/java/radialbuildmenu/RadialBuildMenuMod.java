@@ -59,6 +59,7 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
     private static final String keyInnerRadius = "rbm-inner-radius";
     private static final String keyOuterRadius = "rbm-outer-radius";
     private static final String keyHudColor = "rbm-hudcolor";
+    private static final String keyCenterScreen = "rbm-center-screen";
     private static final String keyTimeMinutes = "rbm-time-minutes";
     private static final String keyPlanetName = "rbm-planet";
 
@@ -96,6 +97,7 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         Core.settings.defaults(keyInnerRadius, 80);
         Core.settings.defaults(keyOuterRadius, 140);
         Core.settings.defaults(keyHudColor, defaultHudColorHex());
+        Core.settings.defaults(keyCenterScreen, false);
         Core.settings.defaults(keyTimeMinutes, 0);
         Core.settings.defaults(keyPlanetName, "");
         for(int i = 0; i < maxSlots; i++){
@@ -119,6 +121,7 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
             table.sliderPref(keyInnerRadius, 80, 40, 200, 5, v -> v + "px");
             table.sliderPref(keyOuterRadius, 140, 60, 360, 5, v -> v + "px");
             table.pref(new HudColorSetting());
+            table.checkPref(keyCenterScreen, false);
 
             table.pref(new HeaderSetting(Core.bundle.get("rbm.section.base")));
             for(int i = 0; i < maxSlots; i++) table.pref(new SlotSetting(i, keySlotPrefix, "rbm.setting.slot"));
@@ -778,6 +781,11 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
                     return;
                 }
 
+                if(Core.settings.getBool(keyCenterScreen, false)){
+                    centerX = getWidth() / 2f;
+                    centerY = getHeight() / 2f;
+                }
+
                 hovered = findHovered();
 
                 if(Core.input.keyRelease(radialMenu)){
@@ -906,8 +914,13 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
 
         private void begin(){
             active = true;
-            centerX = Core.input.mouseX();
-            centerY = Core.input.mouseY();
+            if(Core.settings.getBool(keyCenterScreen, false)){
+                centerX = getWidth() / 2f;
+                centerY = getHeight() / 2f;
+            }else{
+                centerX = Core.input.mouseX();
+                centerY = Core.input.mouseY();
+            }
 
             slotsPrefix = mod.resolveSlotPrefix();
             for(int i = 0; i < slots.length; i++){
