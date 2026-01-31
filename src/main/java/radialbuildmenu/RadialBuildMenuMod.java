@@ -762,8 +762,11 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
 
             float alpha = parentAlpha * Mathf.clamp(Core.settings.getInt(keyHudAlpha, 100) / 100f);
             float scale = Mathf.clamp(Core.settings.getInt(keyHudScale, 100) / 100f, 0.1f, 5f);
+            float innerSetting = Core.settings.getInt(keyInnerRadius, 80);
+            float outerSetting = Core.settings.getInt(keyOuterRadius, 140);
+            float radiusScale = Mathf.clamp((innerSetting / 80f + outerSetting / 140f) / 2f, 0.5f, 3f);
 
-            float iconSize = Scl.scl(46f) * scale;
+            float iconSize = Scl.scl(46f) * scale * radiusScale;
             float innerRadius = Scl.scl(Core.settings.getInt(keyInnerRadius, 80)) * scale;
             float outerRadius = Scl.scl(Core.settings.getInt(keyOuterRadius, 140)) * scale;
             outerRadius = Math.max(outerRadius, innerRadius + iconSize * 1.15f);
@@ -774,12 +777,12 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
             hudColor.set(mod.readHudColor());
 
             // soft background disc around the cursor
-            Draw.color(0f, 0f, 0f, 0.18f * alpha);
+            Draw.color(hudColor, 0.22f * alpha);
             float backRadius = (outerActive ? outerRadius : innerRadius) + iconSize * 0.75f;
             Fill.circle(centerX, centerY, backRadius);
 
             // ring
-            Draw.color(hudColor, 0.65f * alpha);
+            Draw.color(Pal.accent, 0.65f * alpha);
             Lines.stroke(Scl.scl(2f) * scale);
             Lines.circle(centerX, centerY, innerRadius);
             if(outerActive){
@@ -797,11 +800,11 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
                 boolean isHovered = i == hovered;
 
                 // slot background
-                Draw.color(0f, 0f, 0f, (isHovered ? 0.70f : 0.45f) * alpha);
+                Draw.color(hudColor, (isHovered ? 0.40f : 0.28f) * alpha);
                 Fill.circle(px, py, slotBack);
 
                 // slot border
-                Draw.color(isHovered ? hudColor : Color.gray, (isHovered ? 1f : 0.35f) * alpha);
+                Draw.color(isHovered ? Pal.accent : Color.gray, (isHovered ? 1f : 0.35f) * alpha);
                 Lines.stroke(Scl.scl(isHovered ? 2.4f : 1.6f) * scale);
                 Lines.circle(px, py, slotBack);
 
@@ -858,7 +861,7 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
 
             outerActive = false;
             for(int i = slotsPerRing; i < maxSlots; i++){
-                if(!mod.slotName(slotsPrefix, i).isEmpty()){
+                if(slots[i] != null){
                     outerActive = true;
                     break;
                 }
@@ -869,7 +872,10 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
 
         private int findHovered(){
             float scale = Mathf.clamp(Core.settings.getInt(keyHudScale, 100) / 100f, 0.1f, 5f);
-            float iconSize = Scl.scl(46f) * scale;
+            float innerSetting = Core.settings.getInt(keyInnerRadius, 80);
+            float outerSetting = Core.settings.getInt(keyOuterRadius, 140);
+            float radiusScale = Mathf.clamp((innerSetting / 80f + outerSetting / 140f) / 2f, 0.5f, 3f);
+            float iconSize = Scl.scl(46f) * scale * radiusScale;
             float innerRadius = Scl.scl(Core.settings.getInt(keyInnerRadius, 80)) * scale;
             float outerRadius = Scl.scl(Core.settings.getInt(keyOuterRadius, 140)) * scale;
             outerRadius = Math.max(outerRadius, innerRadius + iconSize * 1.15f);
