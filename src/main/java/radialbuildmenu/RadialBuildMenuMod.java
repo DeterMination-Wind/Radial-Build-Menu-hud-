@@ -716,6 +716,10 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         private String slotsPrefix = keySlotPrefix;
         private boolean outerActive;
         private final Color hudColor = new Color();
+        private final int[] innerIndices = new int[slotsPerRing];
+        private final int[] outerIndices = new int[slotsPerRing];
+        private int innerCount;
+        private int outerCount;
 
         public RadialHud(RadialBuildMenuMod mod){
             this.mod = mod;
@@ -789,15 +793,14 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
                 Lines.circle(centerX, centerY, outerRadius);
             }
 
-            int slotCount = outerActive ? maxSlots : slotsPerRing;
-            for(int i = 0; i < slotCount; i++){
-                float ringRadius = (i < slotsPerRing ? innerRadius : outerRadius);
-                int ringIndex = i % slotsPerRing;
-                float angle = 90f - ringIndex * 45f;
-                float px = centerX + Mathf.cosDeg(angle) * ringRadius;
-                float py = centerY + Mathf.sinDeg(angle) * ringRadius;
+            // draw inner ring slots (only configured)
+            for(int order = 0; order < innerCount; order++){
+                int slotIndex = innerIndices[order];
+                float angle = angleForOrder(order, innerCount);
+                float px = centerX + Mathf.cosDeg(angle) * innerRadius;
+                float py = centerY + Mathf.sinDeg(angle) * innerRadius;
 
-                boolean isHovered = i == hovered;
+                boolean isHovered = slotIndex == hovered;
 
                 // slot background
                 Draw.color(hudColor, (isHovered ? 0.40f : 0.28f) * alpha);
@@ -808,17 +811,33 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
                 Lines.stroke(Scl.scl(isHovered ? 2.4f : 1.6f) * scale);
                 Lines.circle(px, py, slotBack);
 
-                Block block = slots[i];
-                if(block != null){
+                Block block = slots[slotIndex];
+                if(block == null) continue;
+                Draw.color(Color.white, alpha);
+                Draw.rect(block.uiIcon, px, py, iconSize, iconSize);
+            }
+
+            // draw outer ring slots (only configured)
+            if(outerActive){
+                for(int order = 0; order < outerCount; order++){
+                    int slotIndex = outerIndices[order];
+                    float angle = angleForOrder(order, outerCount);
+                    float px = centerX + Mathf.cosDeg(angle) * outerRadius;
+                    float py = centerY + Mathf.sinDeg(angle) * outerRadius;
+
+                    boolean isHovered = slotIndex == hovered;
+
+                    Draw.color(hudColor, (isHovered ? 0.40f : 0.28f) * alpha);
+                    Fill.circle(px, py, slotBack);
+
+                    Draw.color(isHovered ? Pal.accent : Color.gray, (isHovered ? 1f : 0.35f) * alpha);
+                    Lines.stroke(Scl.scl(isHovered ? 2.4f : 1.6f) * scale);
+                    Lines.circle(px, py, slotBack);
+
+                    Block block = slots[slotIndex];
+                    if(block == null) continue;
                     Draw.color(Color.white, alpha);
                     Draw.rect(block.uiIcon, px, py, iconSize, iconSize);
-                }else{
-                    // empty slot indicator (X)
-                    Draw.color(Color.lightGray, 0.9f * alpha);
-                    Lines.stroke(Scl.scl(2f) * scale);
-                    float s = iconSize / 3f;
-                    Lines.line(px - s, py - s, px + s, py + s);
-                    Lines.line(px - s, py + s, px + s, py - s);
                 }
             }
 
@@ -859,15 +878,35 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
                 slots[i] = mod.slotBlock(slotsPrefix, i);
             }
 
-            outerActive = false;
-            for(int i = slotsPerRing; i < maxSlots; i++){
+            rebuildActiveSlotLists();
+
+            hovered = findHovered();
+        }
+
+        private void rebuildActiveSlotLists(){
+            innerCount = 0;
+            outerCount = 0;
+
+            for(int i = 0; i < slotsPerRing; i++){
                 if(slots[i] != null){
-                    outerActive = true;
-                    break;
+                    innerIndices[innerCount++] = i;
                 }
             }
 
-            hovered = findHovered();
+            for(int i = 0; i < slotsPerRing; i++){
+                int slotIndex = slotsPerRing + i;
+                if(slots[slotIndex] != null){
+                    outerIndices[outerCount++] = slotIndex;
+                }
+            }
+
+            outerActive = outerCount > 0;
+        }
+
+        private float angleForOrder(int order, int count){
+            if(count <= 0) return 90f;
+            float step = 360f / count;
+            return 90f - order * step;
         }
 
         private int findHovered(){
@@ -885,46 +924,73 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
             float mx = Core.input.mouseX();
             float my = Core.input.mouseY();
 
-            int best = -1;
+            // hover hit-test (inner + outer)
+            int bestSlot = -1;
             float bestDst2 = hit2;
 
-            int slotCount = outerActive ? maxSlots : slotsPerRing;
-            for(int i = 0; i < slotCount; i++){
-                float ringRadius = (i < slotsPerRing ? innerRadius : outerRadius);
-                int ringIndex = i % slotsPerRing;
-                float angle = 90f - ringIndex * 45f;
-                float px = centerX + Mathf.cosDeg(angle) * ringRadius;
-                float py = centerY + Mathf.sinDeg(angle) * ringRadius;
+            for(int order = 0; order < innerCount; order++){
+                int slotIndex = innerIndices[order];
+                float angle = angleForOrder(order, innerCount);
+                float px = centerX + Mathf.cosDeg(angle) * innerRadius;
+                float py = centerY + Mathf.sinDeg(angle) * innerRadius;
                 float dx = mx - px;
                 float dy = my - py;
                 float dst2 = dx * dx + dy * dy;
                 if(dst2 <= bestDst2){
                     bestDst2 = dst2;
-                    best = i;
+                    bestSlot = slotIndex;
                 }
             }
 
-            if(best != -1) return best;
+            if(outerActive){
+                for(int order = 0; order < outerCount; order++){
+                    int slotIndex = outerIndices[order];
+                    float angle = angleForOrder(order, outerCount);
+                    float px = centerX + Mathf.cosDeg(angle) * outerRadius;
+                    float py = centerY + Mathf.sinDeg(angle) * outerRadius;
+                    float dx = mx - px;
+                    float dy = my - py;
+                    float dst2 = dx * dx + dy * dy;
+                    if(dst2 <= bestDst2){
+                        bestDst2 = dst2;
+                        bestSlot = slotIndex;
+                    }
+                }
+            }
 
+            if(bestSlot != -1) return bestSlot;
+
+            // direction-based selection
             float dx = mx - centerX;
             float dy = my - centerY;
             float deadzone = iconSize * 0.35f;
             if(dx * dx + dy * dy < deadzone * deadzone) return -1;
 
-            int sector = sectorIndex(dx, dy);
-            int candidate = (outerActive ? slotsPerRing + sector : sector);
-            if(candidate < 0 || candidate >= slotCount) return -1;
-            return slots[candidate] == null ? -1 : candidate;
+            if(outerActive){
+                // only applies to outer ring; inner ring requires hover
+                if(outerCount <= 0) return -1;
+                int order = orderIndex(dx, dy, outerCount);
+                if(order < 0 || order >= outerCount) return -1;
+                return outerIndices[order];
+            }else{
+                // only inner ring exists; direction selection selects inner slot
+                if(innerCount <= 0) return -1;
+                int order = orderIndex(dx, dy, innerCount);
+                if(order < 0 || order >= innerCount) return -1;
+                return innerIndices[order];
+            }
         }
 
-        private int sectorIndex(float dx, float dy){
+        private int orderIndex(float dx, float dy, int count){
+            if(count <= 0) return -1;
             // NOTE: use angleExact(x, y). Mathf.atan2() has unusual parameter order.
             float angle = Mathf.angleExact(dx, dy);
 
             float rotated = 90f - angle;
             rotated = ((rotated % 360f) + 360f) % 360f;
-            int idx = (int)Math.floor((rotated + 22.5f) / 45f) % 8;
-            if(idx < 0) idx += 8;
+            float step = 360f / count;
+            int idx = (int)Math.floor((rotated + step / 2f) / step) % count;
+            if(idx < 0) idx += count;
             return idx;
         }
 
