@@ -231,23 +231,25 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
             float prefWidth = Math.min(Core.graphics.getWidth() / 1.2f, 560f);
             table.table(Tex.button, t -> {
                 t.left().margin(10f);
-                t.add(title).width(120f).left();
+
+                t.add(title).left().growX().minWidth(0f).wrap();
+                t.row();
 
                 Image preview = new Image(Tex.whiteui);
                 preview.setScaling(Scaling.stretch);
                 preview.setColor(readHudColor());
-                t.add(preview).size(22f).padRight(8f);
 
-                TextField field = new TextField();
+                TextField field = new TextField(Core.settings.getString(keyHudColor, defaultHudColorHex()));
                 field.setMessageText(defaultHudColorHex());
-                field.setText(Core.settings.getString(keyHudColor, defaultHudColorHex()));
-                field.setFilter((text, c) -> isHexChar(c));
+                field.setFilter((text, c) -> isHexChar(c) || c == '#');
 
-                field.changed(() -> {
+                Runnable applyField = () -> {
                     String hex = normalizeHex(field.getText());
                     Core.settings.put(keyHudColor, hex);
                     preview.setColor(readHudColor());
-                });
+                };
+
+                field.changed(applyField);
 
                 field.update(() -> {
                     if(Core.scene.getKeyboardFocus() == field) return;
@@ -259,7 +261,25 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
                     preview.setColor(readHudColor());
                 });
 
-                t.add(field).width(160f);
+                t.table(row -> {
+                    row.left();
+                    row.add(preview).size(22f).padRight(8f);
+                    row.add(field).minWidth(140f).growX().maxWidth(220f);
+
+                    row.button("@rbm.color.pick", Styles.flatt, () -> showHudColorPicker(color -> {
+                        // picker returns color in #RRGGBB or #RRGGBBAA
+                        String hex = color.toString();
+                        if(hex.length() > 6) hex = hex.substring(0, 6);
+                        Core.settings.put(keyHudColor, normalizeHex(hex));
+                        preview.setColor(readHudColor());
+                    })).width(110f).height(40f).padLeft(6f);
+
+                    row.button("@rbm.color.reset", Styles.flatt, () -> {
+                        Core.settings.put(keyHudColor, defaultHudColorHex());
+                        field.setText(Core.settings.getString(keyHudColor, defaultHudColorHex()));
+                        preview.setColor(readHudColor());
+                    }).width(110f).height(40f).padLeft(6f);
+                }).growX().fillX().minWidth(0f);
             }).width(prefWidth).padTop(6f);
             table.row();
         }
@@ -267,6 +287,22 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         private boolean isHexChar(char c){
             return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
         }
+    }
+
+    private void showHudColorPicker(arc.func.Cons<Color> cons){
+        if(ui == null || ui.picker == null){
+            BaseDialog dialog = new BaseDialog("@pickcolor");
+            dialog.addCloseButton();
+            dialog.show();
+            return;
+        }
+
+        Color color = readHudColor();
+        color.a = 1f;
+        ui.picker.show(color, false, picked -> {
+            if(picked == null) return;
+            cons.get(picked);
+        });
     }
 
     private class TimeMinutesSetting extends SettingsMenuDialog.SettingsTable.Setting{
