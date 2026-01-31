@@ -30,3 +30,9 @@ From the `Mindustry-master` root directory:
 输出文件 / Output:
 
 `mods/radial-build-menu/build/libs/radial-build-menu.zip`
+
+## 版本号规则 / Versioning
+
+之后的更新会按 `功能增加.功能改变.bug修复` 自动递增版本号。
+
+Future updates follow `feature-add.feature-change.bugfix` and will bump the version automatically.

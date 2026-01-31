@@ -912,8 +912,8 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         }
 
         private int sectorIndex(float dx, float dy){
-            float angle = Mathf.atan2(dy, dx) * Mathf.radDeg;
-            if(angle < 0f) angle += 360f;
+            // NOTE: use angleExact(x, y). Mathf.atan2() has unusual parameter order.
+            float angle = Mathf.angleExact(dx, dy);
 
             float rotated = 90f - angle;
             rotated = ((rotated % 360f) + 360f) % 360f;
