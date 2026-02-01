@@ -3,11 +3,22 @@ plugins{
 }
 
 group = "radialbuildmenu"
-version = "4.2.0"
+version = "4.2.1"
+
+repositories{
+    mavenCentral()
+    maven{ url "https://jitpack.io" }
+}
 
 dependencies{
-    // Build against this Mindustry source checkout.
-    compileOnly project(":core")
+    // Prefer building against a local Mindustry source checkout (as an included subproject).
+    if(rootProject.findProject(":core") != null){
+        compileOnly project(":core")
+    }else{
+        // Standalone build: fetch Mindustry core from JitPack.
+        def mindustryVersion = (findProperty("mindustryVersion") ?: "v154.3").toString()
+        compileOnly "com.github.Anuken.MindustryJitpack:core:$mindustryVersion"
+    }
 }
 
 tasks.withType(JavaCompile).configureEach{

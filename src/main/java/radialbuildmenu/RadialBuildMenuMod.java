@@ -130,6 +130,7 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
             ensureDefaults();
             registerSettings();
             Time.runTask(10f, this::ensureOverlayAttached);
+            GithubUpdateCheck.checkOnce();
         });
 
         Events.on(WorldLoadEvent.class, e -> {
