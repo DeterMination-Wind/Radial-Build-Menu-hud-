@@ -3,7 +3,7 @@ plugins{
 }
 
 group = "radialbuildmenu"
-version = "4.0.0"
+version = "4.1.0"
 
 dependencies{
     // Build against this Mindustry source checkout.
@@ -16,4 +16,17 @@ tasks.withType(JavaCompile).configureEach{
 
 jar{
     archiveFileName = "${project.name}.zip"
+}
+
+tasks.register("copyZipToRoot", Copy){
+    dependsOn(tasks.named("jar"))
+    from(tasks.named("jar").flatMap{ it.archiveFile })
+    // user requested: put the zip next to "Mindustry-main" (i.e. parent folder of this repo)
+    into(rootProject.projectDir.parentFile)
+    rename{ _ -> "${project.name}.zip" }
+    doNotTrackState("Copying into repo root may include locked Gradle cache files; state tracking is unnecessary here.")
+}
+
+tasks.named("jar").configure{
+    finalizedBy(tasks.named("copyZipToRoot"))
 }

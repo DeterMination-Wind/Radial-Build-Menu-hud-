@@ -55,6 +55,7 @@ import static mindustry.Vars.control;
 
 public class RadialBuildMenuMod extends mindustry.mod.Mod{
     private static final String overlayName = "rbm-overlay";
+    private static final String previewOverlayName = "rbm-preview-overlay";
 
     private static final int slotsPerRing = 8;
     private static final int maxSlots = 16;
@@ -73,6 +74,7 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
     private static final String keyRingAlpha = "rbm-ring-alpha";
     private static final String keyRingStroke = "rbm-ring-stroke";
     private static final String keyHudColor = "rbm-hudcolor";
+    private static final String keyHudPreview = "rbm-hud-preview";
     private static final String keyCenterScreen = "rbm-center-screen";
     private static final String keyProMode = "rbm-pro-mode";
     private static final String keyTimeMinutes = "rbm-time-minutes";
@@ -130,11 +132,13 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
             ensureDefaults();
             registerSettings();
             Time.runTask(10f, this::ensureOverlayAttached);
+            Time.runTask(10f, this::ensurePreviewOverlayAttached);
         });
 
         Events.on(WorldLoadEvent.class, e -> {
             resetMatchState();
             Time.runTask(10f, this::ensureOverlayAttached);
+            Time.runTask(10f, this::ensurePreviewOverlayAttached);
         });
     }
 
@@ -149,6 +153,7 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         Core.settings.defaults(keyRingAlpha, 65);
         Core.settings.defaults(keyRingStroke, 2);
         Core.settings.defaults(keyHudColor, defaultHudColorHex());
+        Core.settings.defaults(keyHudPreview, false);
         Core.settings.defaults(keyCenterScreen, false);
         Core.settings.defaults(keyProMode, false);
         Core.settings.defaults(keyTimeMinutes, 0);
@@ -192,6 +197,7 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
             table.sliderPref(keyInnerRadius, 80, 40, 200, 5, v -> v + "px");
             table.sliderPref(keyOuterRadius, 140, 60, 360, 5, v -> v + "px");
             table.pref(new HudColorSetting());
+            table.checkPref(keyHudPreview, false);
             table.checkPref(keyCenterScreen, false);
             table.checkPref(keyProMode, false);
             table.pref(new AdvancedButtonSetting(RadialBuildMenuMod.this));
@@ -269,6 +275,8 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
 
         ScrollPane pane = new ScrollPane(adv);
         pane.setFadeScrollBars(false);
+        pane.setScrollingDisabled(true, false);
+        pane.setOverscroll(false, false);
         dialog.cont.table(t -> {
             t.center();
             t.add(pane).width(prefWidth()).growY().minHeight(380f);
@@ -1247,6 +1255,163 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         ui.hudGroup.addChild(hud);
     }
 
+    private void ensurePreviewOverlayAttached(){
+        if(ui == null || ui.settings == null) return;
+        if(Core.scene == null || Core.scene.root == null) return;
+        if(Core.scene.root.find(previewOverlayName) != null) return;
+
+        HudPreviewOverlay preview = new HudPreviewOverlay(this);
+        preview.name = previewOverlayName;
+        preview.touchable = Touchable.disabled;
+        Core.scene.add(preview);
+    }
+
+    private static class HudPreviewOverlay extends Element{
+        private final RadialBuildMenuMod mod;
+        private final Block[] slots = new Block[maxSlots];
+        private boolean outerActive;
+        private final Color hudColor = new Color();
+        private final int[] innerIndices = new int[slotsPerRing];
+        private final int[] outerIndices = new int[slotsPerRing];
+        private int innerCount;
+        private int outerCount;
+
+        public HudPreviewOverlay(RadialBuildMenuMod mod){
+            this.mod = mod;
+            touchable = Touchable.disabled;
+        }
+
+        @Override
+        public void act(float delta){
+            super.act(delta);
+            if(parent != null){
+                setBounds(0f, 0f, parent.getWidth(), parent.getHeight());
+            }else{
+                setSize(Core.scene.getWidth(), Core.scene.getHeight());
+            }
+
+            boolean show = Core.settings.getBool(keyHudPreview, false) && ui != null && ui.settings != null && ui.settings.isShown();
+            visible = show;
+            if(!show) return;
+
+            // keep above dialogs; touch is disabled so it won't block clicks
+            toFront();
+
+            // preview uses base slot profile
+            for(int i = 0; i < maxSlots; i++){
+                slots[i] = mod.slotBlock(keySlotPrefix, i);
+            }
+            rebuildActiveSlotLists();
+        }
+
+        @Override
+        public void draw(){
+            if(!visible) return;
+
+            float cx = getWidth() - Scl.scl(220f);
+            float cy = getHeight() / 2f;
+
+            float alpha = parentAlpha * Mathf.clamp(Core.settings.getInt(keyHudAlpha, 100) / 100f);
+            float scale = Mathf.clamp(Core.settings.getInt(keyHudScale, 100) / 100f, 0.1f, 5f);
+            float innerSetting = Core.settings.getInt(keyInnerRadius, 80);
+            float outerSetting = Core.settings.getInt(keyOuterRadius, 140);
+            float radiusScale = Mathf.clamp((innerSetting / 80f + outerSetting / 140f) / 2f, 0.5f, 3f);
+
+            float iconSizeScale = Mathf.clamp(Core.settings.getInt(keyIconScale, 100) / 100f, 0.2f, 5f);
+            float iconSize = Scl.scl(46f) * scale * radiusScale * iconSizeScale;
+            float innerRadius = Scl.scl(Core.settings.getInt(keyInnerRadius, 80)) * scale;
+            float outerRadius = Scl.scl(Core.settings.getInt(keyOuterRadius, 140)) * scale;
+            outerRadius = Math.max(outerRadius, innerRadius + iconSize * 1.15f);
+            float slotBack = iconSize / 2f + Scl.scl(10f) * scale;
+            float strokeNorm = Scl.scl(1.6f) * scale;
+
+            Draw.z(1005f);
+
+            hudColor.set(mod.readHudColor());
+
+            float backStrength = Mathf.clamp(Core.settings.getInt(keyBackStrength, 22) / 100f);
+            Draw.color(hudColor, backStrength * alpha);
+            float backRadius = (outerActive ? outerRadius : innerRadius) + iconSize * 0.75f;
+            Fill.circle(cx, cy, backRadius);
+
+            float ringAlpha = Mathf.clamp(Core.settings.getInt(keyRingAlpha, 65) / 100f);
+            Draw.color(Pal.accent, ringAlpha * alpha);
+            Lines.stroke(Scl.scl(Core.settings.getInt(keyRingStroke, 2)) * scale);
+            Lines.circle(cx, cy, innerRadius);
+            if(outerActive){
+                Lines.circle(cx, cy, outerRadius);
+            }
+
+            for(int order = 0; order < innerCount; order++){
+                int slotIndex = innerIndices[order];
+                float angle = angleForOrder(order, innerCount);
+                float px = cx + Mathf.cosDeg(angle) * innerRadius;
+                float py = cy + Mathf.sinDeg(angle) * innerRadius;
+
+                Draw.color(hudColor, 0.28f * alpha);
+                Fill.circle(px, py, slotBack);
+
+                Draw.color(Color.gray, 0.35f * alpha);
+                Lines.stroke(strokeNorm);
+                Lines.circle(px, py, slotBack);
+
+                Block block = slots[slotIndex];
+                if(block == null) continue;
+                Draw.color(Color.white, alpha);
+                Draw.rect(block.uiIcon, px, py, iconSize, iconSize);
+            }
+
+            if(outerActive){
+                for(int order = 0; order < outerCount; order++){
+                    int slotIndex = outerIndices[order];
+                    float angle = angleForOrder(order, outerCount);
+                    float px = cx + Mathf.cosDeg(angle) * outerRadius;
+                    float py = cy + Mathf.sinDeg(angle) * outerRadius;
+
+                    Draw.color(hudColor, 0.28f * alpha);
+                    Fill.circle(px, py, slotBack);
+
+                    Draw.color(Color.gray, 0.35f * alpha);
+                    Lines.stroke(strokeNorm);
+                    Lines.circle(px, py, slotBack);
+
+                    Block block = slots[slotIndex];
+                    if(block == null) continue;
+                    Draw.color(Color.white, alpha);
+                    Draw.rect(block.uiIcon, px, py, iconSize, iconSize);
+                }
+            }
+
+            Draw.reset();
+        }
+
+        private void rebuildActiveSlotLists(){
+            innerCount = 0;
+            outerCount = 0;
+
+            for(int i = 0; i < slotsPerRing; i++){
+                if(slots[i] != null){
+                    innerIndices[innerCount++] = i;
+                }
+            }
+
+            for(int i = 0; i < slotsPerRing; i++){
+                int slotIndex = slotsPerRing + i;
+                if(slots[slotIndex] != null){
+                    outerIndices[outerCount++] = slotIndex;
+                }
+            }
+
+            outerActive = outerCount > 0;
+        }
+
+        private float angleForOrder(int order, int count){
+            if(count <= 0) return 90f;
+            float step = 360f / count;
+            return 90f - order * step;
+        }
+    }
+
     private static class RadialHud extends Element{
         private final RadialBuildMenuMod mod;
 
@@ -1627,7 +1792,8 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
 
             slider.change();
 
-            addDesc(table.stack(slider, content).width(prefWidth()).left().padTop(4f).get());
+            // leave room for the vertical scrollbar on the right side
+            addDesc(table.stack(slider, content).width(prefWidth() - 44f).left().padTop(4f).get());
             table.row();
         }
     }
