@@ -18,8 +18,16 @@ jar{
     archiveFileName = "${project.name}.zip"
 }
 
-tasks.register("copyZipToRoot", Copy){
+tasks.register("copyZipToDist", Copy){
     dependsOn(tasks.named("jar"))
+    from(tasks.named("jar").flatMap{ it.archiveFile })
+    into(new File(project.projectDir, "dist"))
+    rename{ _ -> "${project.name}.zip" }
+    doNotTrackState("Copying into dist is a convenience step; state tracking is unnecessary here.")
+}
+
+tasks.register("copyZipToRoot", Copy){
+    dependsOn(tasks.named("copyZipToDist"))
     from(tasks.named("jar").flatMap{ it.archiveFile })
     // user requested: put the zip next to "Mindustry-main" (i.e. parent folder of this repo)
     into(rootProject.projectDir.parentFile)
@@ -28,5 +36,6 @@ tasks.register("copyZipToRoot", Copy){
 }
 
 tasks.named("jar").configure{
+    finalizedBy(tasks.named("copyZipToDist"))
     finalizedBy(tasks.named("copyZipToRoot"))
 }
