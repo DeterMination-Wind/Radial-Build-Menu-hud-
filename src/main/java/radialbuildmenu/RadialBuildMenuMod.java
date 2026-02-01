@@ -1263,7 +1263,7 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         HudPreviewOverlay preview = new HudPreviewOverlay(this);
         preview.name = previewOverlayName;
         preview.touchable = Touchable.disabled;
-        Core.scene.add(preview);
+        Core.scene.root.addChild(preview);
     }
 
     private static class HudPreviewOverlay extends Element{
@@ -1290,7 +1290,10 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
                 setSize(Core.scene.getWidth(), Core.scene.getHeight());
             }
 
-            boolean show = Core.settings.getBool(keyHudPreview, false) && ui != null && ui.settings != null && ui.settings.isShown();
+            boolean settingsOpen = ui != null
+                && ui.settings != null
+                && (ui.settings.isShown() || (ui.settings.getScene() != null && ui.settings.parent != null));
+            boolean show = Core.settings.getBool(keyHudPreview, false) && settingsOpen;
             visible = show;
             if(!show) return;
 
@@ -1756,7 +1759,7 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
 
     private static float prefWidth(){
         // slightly wider so long texts don't get clipped in settings dialogs
-        return Math.min(Core.graphics.getWidth() / 1.08f, 820f);
+        return Math.min(Core.graphics.getWidth() / 1.02f, 980f);
     }
 
     private static class WideSliderSetting extends SettingsMenuDialog.SettingsTable.Setting{
@@ -1793,7 +1796,7 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
             slider.change();
 
             // leave room for the vertical scrollbar on the right side
-            addDesc(table.stack(slider, content).width(prefWidth() - 44f).left().padTop(4f).get());
+            addDesc(table.stack(slider, content).width(prefWidth() - 64f).left().padTop(4f).get());
             table.row();
         }
     }

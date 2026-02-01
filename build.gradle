@@ -3,7 +3,7 @@ plugins{
 }
 
 group = "radialbuildmenu"
-version = "4.1.0"
+version = "4.1.1"
 
 dependencies{
     // Build against this Mindustry source checkout.
