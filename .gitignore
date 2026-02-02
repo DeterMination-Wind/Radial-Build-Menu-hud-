@@ -1,6 +1,7 @@
 # Gradle
 .gradle/
 build/
+bin/
 
 # IDE
 .idea/
@@ -12,4 +13,3 @@ build/
 # OS
 Thumbs.db
 Desktop.ini
-

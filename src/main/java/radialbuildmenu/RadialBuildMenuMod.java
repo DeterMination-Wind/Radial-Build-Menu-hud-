@@ -1538,6 +1538,11 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
             float mx = Core.input.mouseX();
             float my = Core.input.mouseY();
 
+            // When the cursor is on/inside the inner ring radius, never allow selecting outer ring slots.
+            float centerDx = mx - centerX;
+            float centerDy = my - centerY;
+            boolean preferInner = innerCount > 0 && (centerDx * centerDx + centerDy * centerDy) <= innerRadius * innerRadius;
+
             // hover hit-test (inner + outer)
             int bestSlot = -1;
             float bestDst2 = hit2;
@@ -1556,7 +1561,7 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
                 }
             }
 
-            if(outerActive){
+            if(outerActive && !preferInner){
                 for(int order = 0; order < outerCount; order++){
                     int slotIndex = outerIndices[order];
                     float angle = angleForOrder(order, outerCount);
@@ -1577,13 +1582,19 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
             if(!Core.settings.getBool(keyDirectionSelect, true)) return -1;
 
             // direction-based selection
-            float dx = mx - centerX;
-            float dy = my - centerY;
+            float dx = centerDx;
+            float dy = centerDy;
             float deadzone = iconSize * Mathf.clamp(Core.settings.getInt(keyDeadzoneScale, 35) / 100f);
             if(dx * dx + dy * dy < deadzone * deadzone) return -1;
 
+            if(preferInner){
+                if(innerCount <= 0) return -1;
+                int order = orderIndex(dx, dy, innerCount);
+                if(order < 0 || order >= innerCount) return -1;
+                return innerIndices[order];
+            }
+
             if(outerActive){
-                // only applies to outer ring; inner ring requires hover
                 if(outerCount <= 0) return -1;
                 int order = orderIndex(dx, dy, outerCount);
                 if(order < 0 || order >= outerCount) return -1;
