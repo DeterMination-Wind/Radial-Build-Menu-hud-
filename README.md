@@ -1,5 +1,11 @@
 # 圆盘快捷建造 / Radial Build Menu
 
+## 反馈 / Feedback
+
+【BEK辅助mod反馈群】：https://qm.qq.com/q/cZWzPa4cTu
+
+![BEK辅助mod反馈群二维码](docs/bek-feedback-group.png)
+
 按住热键在鼠标周围打开圆盘 HUD，松开即可快速切换当前选中的建造建筑。
 
 Hold the hotkey to open a radial HUD around your cursor. Release to quickly switch the selected build block.
