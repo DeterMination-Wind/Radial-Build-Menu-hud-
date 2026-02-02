@@ -3,7 +3,7 @@
   "displayName": "圆盘快捷建造 / Radial Build Menu",
   "author": "DeterMination",
   "description": "按住热键在鼠标周围打开圆盘HUD，松开选择最多16个可配置建筑（内圈8 + 外圈8）。 | Hold a hotkey to open a radial HUD around your cursor and release to select up to 16 configurable blocks (8 inner + 8 outer).",
-  "version": "4.2.1",
+  "version": "4.2.2",
   "minGameVersion": 154,
   "hidden": true,
   "java": true,
