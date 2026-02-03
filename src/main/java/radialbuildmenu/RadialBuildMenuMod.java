@@ -1293,6 +1293,7 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
                     Table content = buildMobileToggleContent();
                     xMobileToggleWindow = xOverlayUi.registerWindow(mobileWindowName, content, () -> state != null && state.isGame());
                     if(xMobileToggleWindow != null){
+                        xOverlayUi.configureWindow(xMobileToggleWindow, true, false);
                         xOverlayUi.setEnabledAndPinned(xMobileToggleWindow, true, true);
                         return;
                     }
@@ -1825,6 +1826,8 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         private Method getData;
         private Method setEnabled;
         private Method setPinned;
+        private Method setResizable;
+        private Method setAutoHeight;
 
         boolean isInstalled(){
             if(initialized) return installed;
@@ -1863,6 +1866,16 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
             }
         }
 
+        void configureWindow(Object window, boolean resizable, boolean autoHeight){
+            if(window == null) return;
+            try{
+                tryInitWindowAccessors(window);
+                if(setResizable != null) setResizable.invoke(window, resizable);
+                if(setAutoHeight != null) setAutoHeight.invoke(window, autoHeight);
+            }catch(Throwable ignored){
+            }
+        }
+
         void setEnabledAndPinned(Object window, boolean enabled, boolean pinned){
             if(window == null) return;
             try{
@@ -1885,6 +1898,16 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
                     setAvailability = wc.getMethod("setAvailability", Prov.class);
                 }catch(Throwable ignored){
                     setAvailability = null;
+                }
+                try{
+                    setResizable = wc.getMethod("setResizable", boolean.class);
+                }catch(Throwable ignored){
+                    setResizable = null;
+                }
+                try{
+                    setAutoHeight = wc.getMethod("setAutoHeight", boolean.class);
+                }catch(Throwable ignored){
+                    setAutoHeight = null;
                 }
                 getData = wc.getMethod("getData");
 
