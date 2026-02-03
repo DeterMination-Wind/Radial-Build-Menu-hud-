@@ -2,6 +2,7 @@ package radialbuildmenu;
 
 import arc.Core;
 import arc.Events;
+import arc.func.Prov;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
@@ -22,6 +23,8 @@ import arc.scene.ui.ScrollPane;
 import arc.scene.ui.TextButton;
 import arc.scene.ui.layout.Table;
 import arc.scene.ui.layout.Scl;
+import arc.util.Align;
+import arc.util.Log;
 import arc.util.Scaling;
 import arc.util.serialization.Jval.Jtype;
 import arc.util.Strings;
@@ -44,6 +47,7 @@ import mindustry.world.blocks.storage.CoreBlock;
 import mindustry.world.Block;
 import mindustry.world.meta.BuildVisibility;
 
+import java.lang.reflect.Method;
 import java.util.Locale;
 
 import static mindustry.Vars.player;
@@ -55,6 +59,8 @@ import static mindustry.Vars.control;
 
 public class RadialBuildMenuMod extends mindustry.mod.Mod{
     private static final String overlayName = "rbm-overlay";
+    private static final String mobileToggleName = "rbm-mobile-toggle";
+    private static final String mobileWindowName = "rbm-mobile";
 
     private static final int slotsPerRing = 8;
     private static final int maxSlots = 16;
@@ -74,7 +80,7 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
     private static final String keyRingStroke = "rbm-ring-stroke";
     private static final String keyHudColor = "rbm-hudcolor";
     private static final String keyCenterScreen = "rbm-center-screen";
-    private static final String keyProMode = "rbm-pro-mode";
+    static final String keyProMode = "rbm-pro-mode";
     private static final String keyTimeMinutes = "rbm-time-minutes";
 
     private static final String keyHoverUpdateFrames = "rbm-hover-update-frames";
@@ -117,6 +123,9 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
 
     public static final KeyBind radialMenu = KeyBind.add("rbm_radial_menu", KeyCode.unset, "blocks");
 
+    private final MindustryXOverlayUI xOverlayUi = new MindustryXOverlayUI();
+    private Object xMobileToggleWindow;
+
     private boolean condAfterLatched;
     private boolean condInitActive;
     private boolean condAfterActive;
@@ -134,12 +143,14 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
             ensureDefaults();
             registerSettings();
             Time.runTask(10f, this::ensureOverlayAttached);
+            Time.runTask(10f, this::ensureMobileToggleAttached);
             GithubUpdateCheck.checkOnce();
         });
 
         Events.on(WorldLoadEvent.class, e -> {
             resetMatchState();
             Time.runTask(10f, this::ensureOverlayAttached);
+            Time.runTask(10f, this::ensureMobileToggleAttached);
         });
     }
 
@@ -218,7 +229,7 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         });
     }
 
-    private void showAdvancedDialog(){
+    void showAdvancedDialog(){
         BaseDialog dialog = new BaseDialog("@rbm.advanced.title");
         dialog.addCloseButton();
 
@@ -332,58 +343,7 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         }
     }
 
-    private static class SubHeaderSetting extends SettingsMenuDialog.SettingsTable.Setting{
-        private final String titleKeyOrText;
-
-        public SubHeaderSetting(String titleKeyOrText){
-            super("rbm-subheader");
-            this.titleKeyOrText = titleKeyOrText;
-        }
-
-        @Override
-        public void add(SettingsMenuDialog.SettingsTable table){
-            table.row();
-            table.add(titleKeyOrText.startsWith("@") ? Core.bundle.get(titleKeyOrText.substring(1)) : titleKeyOrText)
-                .color(Color.gray)
-                .padTop(8f)
-                .padBottom(2f)
-                .left()
-                .growX()
-                .minWidth(0f)
-                .wrap();
-            table.row();
-        }
-    }
-
-    private static class AdvancedButtonSetting extends SettingsMenuDialog.SettingsTable.Setting{
-        private final RadialBuildMenuMod mod;
-
-        public AdvancedButtonSetting(RadialBuildMenuMod mod){
-            super("rbm-advanced");
-            this.mod = mod;
-        }
-
-        @Override
-        public void add(SettingsMenuDialog.SettingsTable table){
-            float prefWidth = prefWidth();
-            Table root = table.table(Tex.button, t -> {
-                t.left().margin(10f);
-                t.image(mindustry.gen.Icon.settings).size(20f).padRight(8f);
-                t.add(title, Styles.outlineLabel).left().growX().minWidth(0f).wrap();
-
-                TextButton btn = t.button("@rbm.advanced.open", Styles.flatt, mod::showAdvancedDialog)
-                    .width(190f)
-                    .height(40f)
-                    .padLeft(10f)
-                    .get();
-
-                btn.update(() -> btn.setDisabled(!Core.settings.getBool(keyProMode, false)));
-            }).width(prefWidth).padTop(6f).get();
-
-            addDesc(root);
-            table.row();
-        }
-    }
+    // SubHeaderSetting / AdvancedButtonSetting extracted into `RbmSettingsExtracted`.
 
     private class HotkeySetting extends SettingsMenuDialog.SettingsTable.Setting{
         public HotkeySetting(){
@@ -1052,7 +1012,8 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         }
     }
 
-    private float condVar(String name){
+    // Used by condition expression evaluator (extracted into RbmConditionExpr).
+    float condVar(String name){
         if(name == null) return 0f;
         String n = name.trim().toLowerCase(Locale.ROOT);
         if(n.isEmpty()) return 0f;
@@ -1309,7 +1270,6 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
     }
 
     private void ensureOverlayAttached(){
-        if(mobile) return;
         if(ui == null || ui.hudGroup == null) return;
 
         if(ui.hudGroup.find(overlayName) != null) return;
@@ -1318,6 +1278,59 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         hud.name = overlayName;
         hud.touchable = Touchable.disabled;
         ui.hudGroup.addChild(hud);
+    }
+
+    private void ensureMobileToggleAttached(){
+        if(!mobile) return;
+        if(ui == null || ui.hudGroup == null) return;
+
+        ensureOverlayAttached();
+
+        // Prefer MindustryX OverlayUI if available.
+        if(xOverlayUi.isInstalled()){
+            if(xMobileToggleWindow == null){
+                try{
+                    Table content = buildMobileToggleContent();
+                    xMobileToggleWindow = xOverlayUi.registerWindow(mobileWindowName, content, () -> state != null && state.isGame());
+                    if(xMobileToggleWindow != null){
+                        xOverlayUi.setEnabledAndPinned(xMobileToggleWindow, true, true);
+                        return;
+                    }
+                }catch(Throwable t){
+                    xMobileToggleWindow = null;
+                }
+            }else{
+                return;
+            }
+        }
+
+        // Fallback: attach a fixed-center toggle button directly to the HUD.
+        if(ui.hudGroup.find(mobileToggleName) != null) return;
+
+        Table content = buildMobileToggleContent();
+        content.name = mobileToggleName;
+        ui.hudGroup.addChild(content);
+        content.update(() -> {
+            // Keep centered and above most HUD elements.
+            content.setPosition(Core.graphics.getWidth() / 2f, Core.graphics.getHeight() / 2f, Align.center);
+            content.toFront();
+        });
+    }
+
+    private Table buildMobileToggleContent(){
+        Table t = new Table(Tex.button);
+        t.touchable = Touchable.enabled;
+        t.margin(8f);
+
+        t.button(mindustry.gen.Icon.hammer, Styles.clearNonei, () -> {
+            if(ui == null || ui.hudGroup == null) return;
+            Element e = ui.hudGroup.find(overlayName);
+            if(e instanceof RadialHud){
+                ((RadialHud)e).beginMobile();
+            }
+        }).size(56f);
+
+        return t;
     }
 
     private static class RadialHud extends Element{
@@ -1337,6 +1350,35 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
 
         public RadialHud(RadialBuildMenuMod mod){
             this.mod = mod;
+
+            // Mobile: tap-to-select; close by tapping outside the HUD.
+            addListener(new InputListener(){
+                @Override
+                public boolean touchDown(InputEvent event, float x, float y, int pointer, KeyCode button){
+                    if(!mobile) return false;
+                    if(!active) return false;
+                    if(pointer != 0) return false;
+
+                    float sx = event.stageX;
+                    float sy = event.stageY;
+
+                    int slot = findSlotAt(sx, sy);
+                    if(slot != -1){
+                        hovered = slot;
+                        commitSelection();
+                        close();
+                        return true;
+                    }
+
+                    // Tap outside to close; taps inside the HUD but not on an icon do nothing.
+                    if(isOutsideHud(sx, sy)){
+                        close();
+                        return true;
+                    }
+
+                    return true; // consume while the HUD is open
+                }
+            });
         }
 
         @Override
@@ -1349,10 +1391,19 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
                 setSize(Core.graphics.getWidth(), Core.graphics.getHeight());
             }
 
+            // Keep touch handling disabled unless we're actively showing the HUD on mobile.
+            touchable = (mobile && active) ? Touchable.enabled : Touchable.disabled;
+
             if(active){
                 if(!canStayActive()){
-                    active = false;
-                    hovered = -1;
+                    close();
+                    return;
+                }
+
+                if(mobile){
+                    // Mobile HUD is always centered.
+                    centerX = getWidth() / 2f;
+                    centerY = getHeight() / 2f;
                     return;
                 }
 
@@ -1365,14 +1416,13 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
 
                 if(Core.input.keyRelease(radialMenu)){
                     commitSelection();
-                    active = false;
-                    hovered = -1;
+                    close();
                 }else if(!Core.input.keyDown(radialMenu)){
                     // failsafe: if focus changed and no release is received
-                    active = false;
-                    hovered = -1;
+                    close();
                 }
             }else{
+                if(mobile) return;
                 if(canActivate() && Core.input.keyTap(radialMenu)){
                     begin();
                 }
@@ -1509,6 +1559,98 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
             rebuildActiveSlotLists();
 
             hovered = findHovered();
+        }
+
+        private void beginMobile(){
+            if(active) return;
+            if(!canActivate()) return;
+
+            active = true;
+            hovered = -1;
+            centerX = getWidth() / 2f;
+            centerY = getHeight() / 2f;
+
+            for(int i = 0; i < slots.length; i++){
+                slots[i] = mod.contextSlotBlock(i);
+            }
+            rebuildActiveSlotLists();
+        }
+
+        private void close(){
+            active = false;
+            hovered = -1;
+        }
+
+        private int findSlotAt(float sx, float sy){
+            float scale = Mathf.clamp(Core.settings.getInt(keyHudScale, 100) / 100f, 0.1f, 5f);
+            float innerSetting = Core.settings.getInt(keyInnerRadius, 80);
+            float outerSetting = Core.settings.getInt(keyOuterRadius, 140);
+            float radiusScale = Mathf.clamp((innerSetting / 80f + outerSetting / 140f) / 2f, 0.5f, 3f);
+            float iconSizeScale = Mathf.clamp(Core.settings.getInt(keyIconScale, 100) / 100f, 0.2f, 5f);
+            float iconSize = Scl.scl(46f) * scale * radiusScale * iconSizeScale;
+            float innerRadius = Scl.scl(innerSetting) * scale;
+            float outerRadius = Scl.scl(outerSetting) * scale;
+            outerRadius = Math.max(outerRadius, innerRadius + iconSize * 1.15f);
+            float hit = iconSize / 2f + Scl.scl(Math.max(0, Core.settings.getInt(keyHoverPadding, 12))) * scale;
+            float hit2 = hit * hit;
+
+            float centerDx = sx - centerX;
+            float centerDy = sy - centerY;
+            boolean preferInner = innerCount > 0 && (centerDx * centerDx + centerDy * centerDy) <= innerRadius * innerRadius;
+
+            int bestSlot = -1;
+            float bestDst2 = hit2;
+
+            for(int order = 0; order < innerCount; order++){
+                int slotIndex = innerIndices[order];
+                float angle = angleForOrder(order, innerCount);
+                float px = centerX + Mathf.cosDeg(angle) * innerRadius;
+                float py = centerY + Mathf.sinDeg(angle) * innerRadius;
+                float dx = sx - px;
+                float dy = sy - py;
+                float dst2 = dx * dx + dy * dy;
+                if(dst2 <= bestDst2){
+                    bestDst2 = dst2;
+                    bestSlot = slotIndex;
+                }
+            }
+
+            if(outerActive && !preferInner){
+                for(int order = 0; order < outerCount; order++){
+                    int slotIndex = outerIndices[order];
+                    float angle = angleForOrder(order, outerCount);
+                    float px = centerX + Mathf.cosDeg(angle) * outerRadius;
+                    float py = centerY + Mathf.sinDeg(angle) * outerRadius;
+                    float dx = sx - px;
+                    float dy = sy - py;
+                    float dst2 = dx * dx + dy * dy;
+                    if(dst2 <= bestDst2){
+                        bestDst2 = dst2;
+                        bestSlot = slotIndex;
+                    }
+                }
+            }
+
+            return bestSlot;
+        }
+
+        private boolean isOutsideHud(float sx, float sy){
+            float scale = Mathf.clamp(Core.settings.getInt(keyHudScale, 100) / 100f, 0.1f, 5f);
+            float innerSetting = Core.settings.getInt(keyInnerRadius, 80);
+            float outerSetting = Core.settings.getInt(keyOuterRadius, 140);
+            float radiusScale = Mathf.clamp((innerSetting / 80f + outerSetting / 140f) / 2f, 0.5f, 3f);
+            float iconSizeScale = Mathf.clamp(Core.settings.getInt(keyIconScale, 100) / 100f, 0.2f, 5f);
+            float iconSize = Scl.scl(46f) * scale * radiusScale * iconSizeScale;
+            float innerRadius = Scl.scl(innerSetting) * scale;
+            float outerRadius = Scl.scl(outerSetting) * scale;
+            outerRadius = Math.max(outerRadius, innerRadius + iconSize * 1.15f);
+
+            float outer = outerActive ? outerRadius : innerRadius;
+            float backRadius = outer + iconSize * 0.75f;
+
+            float dx = sx - centerX;
+            float dy = sy - centerY;
+            return dx * dx + dy * dy > backRadius * backRadius;
         }
 
         private void updateHovered(){
@@ -1673,330 +1815,103 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         }
     }
 
-    private static float prefWidth(){
-        // slightly wider so long texts don't get clipped in settings dialogs
-        return Math.min(Core.graphics.getWidth() / 1.02f, 980f);
-    }
+    /** Optional integration with MindustryX OverlayUI. Uses reflection so vanilla builds won't crash. */
+    private static class MindustryXOverlayUI{
+        private boolean initialized = false;
+        private boolean installed = false;
+        private Object instance;
+        private Method registerWindow;
+        private Method setAvailability;
+        private Method getData;
+        private Method setEnabled;
+        private Method setPinned;
 
-    private static class WideSliderSetting extends SettingsMenuDialog.SettingsTable.Setting{
-        private final int def, min, max, step;
-        private final SettingsMenuDialog.StringProcessor sp;
-
-        public WideSliderSetting(String name, int def, int min, int max, int step, SettingsMenuDialog.StringProcessor sp){
-            super(name);
-            this.def = def;
-            this.min = min;
-            this.max = max;
-            this.step = step;
-            this.sp = sp;
-        }
-
-        @Override
-        public void add(SettingsMenuDialog.SettingsTable table){
-            arc.scene.ui.Slider slider = new arc.scene.ui.Slider(min, max, step, false);
-            slider.setValue(Core.settings.getInt(name, def));
-
-            arc.scene.ui.Label value = new arc.scene.ui.Label("", Styles.outlineLabel);
-
-            Table content = new Table();
-            content.add(title, Styles.outlineLabel).left().growX().minWidth(0f).wrap();
-            content.add(value).padLeft(10f).right();
-            content.margin(3f, 33f, 3f, 33f);
-            content.touchable = Touchable.disabled;
-
-            slider.changed(() -> {
-                Core.settings.put(name, (int)slider.getValue());
-                value.setText(sp.get((int)slider.getValue()));
-            });
-
-            slider.change();
-
-            // leave room for the vertical scrollbar on the right side
-            addDesc(table.stack(slider, content).width(prefWidth() - 64f).left().padTop(4f).get());
-            table.row();
-        }
-    }
-
-    private interface Expr{
-        /** Returns 0 for false, non-zero for true. */
-        float eval(RadialBuildMenuMod ctx);
-    }
-
-    private static class ConditionParser{
-        private final String s;
-        private int i;
-
-        private ConditionParser(String s){
-            this.s = s == null ? "" : s;
-        }
-
-        public static Expr parse(String s){
-            ConditionParser p = new ConditionParser(s);
-            Expr out = p.parseOr();
-            p.skipWs();
-            if(!p.eof()){
-                throw new IllegalArgumentException("Unexpected trailing input at " + p.i);
+        boolean isInstalled(){
+            if(initialized) return installed;
+            initialized = true;
+            try{
+                installed = mindustry.Vars.mods != null && mindustry.Vars.mods.locateMod("mindustryx") != null;
+            }catch(Throwable ignored){
+                installed = false;
             }
-            return out;
-        }
+            if(!installed) return false;
 
-        private Expr parseOr(){
-            Expr left = parseXor();
-            while(true){
-                skipWs();
-                if(match("||")){
-                    Expr right = parseXor();
-                    left = new OrExpr(left, right);
-                    continue;
-                }
-                return left;
+            try{
+                Class<?> c = Class.forName("mindustryX.features.ui.OverlayUI");
+                instance = c.getField("INSTANCE").get(null);
+                registerWindow = c.getMethod("registerWindow", String.class, Table.class);
+            }catch(Throwable t){
+                installed = false;
+                Log.err("RBM: MindustryX detected but OverlayUI reflection init failed.", t);
+                return false;
             }
-        }
-
-        private Expr parseXor(){
-            Expr left = parseAnd();
-            while(true){
-                skipWs();
-                if(matchWord("xor")){
-                    Expr right = parseAnd();
-                    left = new XorExpr(left, right);
-                    continue;
-                }
-                return left;
-            }
-        }
-
-        private Expr parseAnd(){
-            Expr left = parseCompare();
-            while(true){
-                skipWs();
-                if(match("&&")){
-                    Expr right = parseCompare();
-                    left = new AndExpr(left, right);
-                    continue;
-                }
-                return left;
-            }
-        }
-
-        private Expr parseCompare(){
-            Expr left = parseUnary();
-            while(true){
-                skipWs();
-
-                if(match(">=")){
-                    Expr right = parseUnary();
-                    left = new CmpExpr(left, right, CmpOp.gte);
-                }else if(match("<=")){
-                    Expr right = parseUnary();
-                    left = new CmpExpr(left, right, CmpOp.lte);
-                }else if(match("==")){
-                    Expr right = parseUnary();
-                    left = new CmpExpr(left, right, CmpOp.eq);
-                }else if(match("!=")){
-                    Expr right = parseUnary();
-                    left = new CmpExpr(left, right, CmpOp.neq);
-                }else if(match(">")){
-                    Expr right = parseUnary();
-                    left = new CmpExpr(left, right, CmpOp.gt);
-                }else if(match("<")){
-                    Expr right = parseUnary();
-                    left = new CmpExpr(left, right, CmpOp.lt);
-                }else{
-                    return left;
-                }
-            }
-        }
-
-        private Expr parseUnary(){
-            skipWs();
-            if(match("!")){
-                return new NotExpr(parseUnary());
-            }
-            if(match("-")){
-                return new NegExpr(parseUnary());
-            }
-            return parsePrimary();
-        }
-
-        private Expr parsePrimary(){
-            skipWs();
-            if(match("(")){
-                Expr e = parseOr();
-                skipWs();
-                if(!match(")")) throw new IllegalArgumentException("Missing ')' at " + i);
-                return e;
-            }
-
-            if(peek() == '@'){
-                i++;
-                String name = readIdent();
-                if(name.isEmpty()) throw new IllegalArgumentException("Empty variable name at " + i);
-                return new VarExpr(name);
-            }
-
-            if(isDigit(peek()) || peek() == '.'){
-                String num = readNumber();
-                try{
-                    return new NumExpr(Float.parseFloat(num));
-                }catch(Throwable t){
-                    throw new IllegalArgumentException("Bad number: " + num);
-                }
-            }
-
-            throw new IllegalArgumentException("Unexpected token at " + i);
-        }
-
-        private String readIdent(){
-            int start = i;
-            while(!eof()){
-                char c = s.charAt(i);
-                boolean ok = (c >= 'a' && c <= 'z')
-                    || (c >= 'A' && c <= 'Z')
-                    || (c >= '0' && c <= '9')
-                    || c == '_' || c == '-';
-                if(!ok) break;
-                i++;
-            }
-            return s.substring(start, i);
-        }
-
-        private String readNumber(){
-            int start = i;
-            boolean dot = false;
-            while(!eof()){
-                char c = s.charAt(i);
-                if(c == '.'){
-                    if(dot) break;
-                    dot = true;
-                    i++;
-                    continue;
-                }
-                if(!isDigit(c)) break;
-                i++;
-            }
-            return s.substring(start, i);
-        }
-
-        private boolean match(String lit){
-            if(lit == null || lit.isEmpty()) return false;
-            if(i + lit.length() > s.length()) return false;
-            if(s.regionMatches(i, lit, 0, lit.length())){
-                i += lit.length();
-                return true;
-            }
-            return false;
-        }
-
-        private boolean matchWord(String word){
-            if(word == null || word.isEmpty()) return false;
-            int len = word.length();
-            if(i + len > s.length()) return false;
-            if(!s.regionMatches(true, i, word, 0, len)) return false;
-
-            // word boundary
-            char before = i > 0 ? s.charAt(i - 1) : ' ';
-            char after = (i + len) < s.length() ? s.charAt(i + len) : ' ';
-            if(isIdentChar(before) || isIdentChar(after)) return false;
-
-            i += len;
             return true;
         }
 
-        private boolean isIdentChar(char c){
-            return (c >= 'a' && c <= 'z')
-                || (c >= 'A' && c <= 'Z')
-                || (c >= '0' && c <= '9')
-                || c == '_' || c == '-';
-        }
-
-        private void skipWs(){
-            while(!eof()){
-                char c = s.charAt(i);
-                if(c != ' ' && c != '\t' && c != '\n' && c != '\r') break;
-                i++;
+        Object registerWindow(String name, Table table, Prov<Boolean> availability){
+            if(!isInstalled()) return null;
+            try{
+                Object window = registerWindow.invoke(instance, name, table);
+                tryInitWindowAccessors(window);
+                if(window != null && availability != null && setAvailability != null){
+                    setAvailability.invoke(window, availability);
+                }
+                return window;
+            }catch(Throwable t){
+                Log.err("RBM: OverlayUI.registerWindow failed.", t);
+                return null;
             }
         }
 
-        private char peek(){
-            return eof() ? '\0' : s.charAt(i);
-        }
-
-        private boolean eof(){
-            return i >= s.length();
-        }
-
-        private boolean isDigit(char c){
-            return c >= '0' && c <= '9';
-        }
-    }
-
-    private static class NumExpr implements Expr{
-        private final float v;
-        NumExpr(float v){ this.v = v; }
-        @Override public float eval(RadialBuildMenuMod ctx){ return v; }
-    }
-
-    private static class VarExpr implements Expr{
-        private final String name;
-        VarExpr(String name){ this.name = name; }
-        @Override public float eval(RadialBuildMenuMod ctx){ return ctx.condVar(name); }
-    }
-
-    private static class NegExpr implements Expr{
-        private final Expr inner;
-        NegExpr(Expr inner){ this.inner = inner; }
-        @Override public float eval(RadialBuildMenuMod ctx){ return -inner.eval(ctx); }
-    }
-
-    private static class NotExpr implements Expr{
-        private final Expr inner;
-        NotExpr(Expr inner){ this.inner = inner; }
-        @Override public float eval(RadialBuildMenuMod ctx){ return inner.eval(ctx) != 0f ? 0f : 1f; }
-    }
-
-    private static class AndExpr implements Expr{
-        private final Expr a, b;
-        AndExpr(Expr a, Expr b){ this.a = a; this.b = b; }
-        @Override public float eval(RadialBuildMenuMod ctx){ return (a.eval(ctx) != 0f && b.eval(ctx) != 0f) ? 1f : 0f; }
-    }
-
-    private static class OrExpr implements Expr{
-        private final Expr a, b;
-        OrExpr(Expr a, Expr b){ this.a = a; this.b = b; }
-        @Override public float eval(RadialBuildMenuMod ctx){ return (a.eval(ctx) != 0f || b.eval(ctx) != 0f) ? 1f : 0f; }
-    }
-
-    private static class XorExpr implements Expr{
-        private final Expr a, b;
-        XorExpr(Expr a, Expr b){ this.a = a; this.b = b; }
-        @Override public float eval(RadialBuildMenuMod ctx){
-            boolean av = a.eval(ctx) != 0f;
-            boolean bv = b.eval(ctx) != 0f;
-            return (av ^ bv) ? 1f : 0f;
-        }
-    }
-
-    private enum CmpOp{ gt, gte, lt, lte, eq, neq }
-
-    private static class CmpExpr implements Expr{
-        private final Expr a, b;
-        private final CmpOp op;
-        CmpExpr(Expr a, Expr b, CmpOp op){ this.a = a; this.b = b; this.op = op; }
-        @Override public float eval(RadialBuildMenuMod ctx){
-            float av = a.eval(ctx);
-            float bv = b.eval(ctx);
-            boolean out;
-            switch(op){
-                case gt: out = av > bv; break;
-                case gte: out = av >= bv; break;
-                case lt: out = av < bv; break;
-                case lte: out = av <= bv; break;
-                case eq: out = av == bv; break;
-                case neq: out = av != bv; break;
-                default: out = false; break;
+        void setEnabledAndPinned(Object window, boolean enabled, boolean pinned){
+            if(window == null) return;
+            try{
+                tryInitWindowAccessors(window);
+                if(getData == null) return;
+                Object data = getData.invoke(window);
+                if(data == null) return;
+                if(setEnabled != null) setEnabled.invoke(data, enabled);
+                if(pinned && setPinned != null) setPinned.invoke(data, true);
+            }catch(Throwable ignored){
             }
-            return out ? 1f : 0f;
+        }
+
+        private void tryInitWindowAccessors(Object window){
+            if(window == null) return;
+            if(getData != null || setAvailability != null) return;
+            try{
+                Class<?> wc = window.getClass();
+                try{
+                    setAvailability = wc.getMethod("setAvailability", Prov.class);
+                }catch(Throwable ignored){
+                    setAvailability = null;
+                }
+                getData = wc.getMethod("getData");
+
+                Object data = getData.invoke(window);
+                if(data != null){
+                    Class<?> dc = data.getClass();
+                    try{
+                        setEnabled = dc.getMethod("setEnabled", boolean.class);
+                    }catch(Throwable ignored){
+                        setEnabled = null;
+                    }
+                    try{
+                        setPinned = dc.getMethod("setPinned", boolean.class);
+                    }catch(Throwable ignored){
+                        setPinned = null;
+                    }
+                }
+            }catch(Throwable ignored){
+            }
         }
     }
+
+    static float prefWidth(){
+        // slightly wider so long texts don't get clipped in settings dialogs
+        return Math.min(Core.graphics.getWidth() / 1.02f, 980f);
+    }
+    // WideSliderSetting extracted into `RbmSettingsExtracted`.
+
+    // Condition expression parsing/eval extracted into `RbmConditionExpr` (same behavior).
 }

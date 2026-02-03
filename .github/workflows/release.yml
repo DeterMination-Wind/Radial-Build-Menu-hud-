@@ -16,7 +16,7 @@ jobs:
       - name: Create/Update GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "dist/radial-build-menu.zip"
+          artifacts: "dist/radial-build-menu.zip,dist/radial-build-menu.jar"
           allowUpdates: true
           replacesArtifacts: true
           draft: false

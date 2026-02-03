@@ -3,7 +3,7 @@ plugins{
 }
 
 group = "radialbuildmenu"
-version = "4.2.2"
+version = "4.2.3"
 
 repositories{
     mavenCentral()
@@ -37,6 +37,16 @@ tasks.register("copyZipToDist", Copy){
     doNotTrackState("Copying into dist is a convenience step; state tracking is unnecessary here.")
 }
 
+tasks.register("copyJarToDist", Copy){
+    dependsOn(tasks.named("copyZipToDist"))
+    // Avoid Gradle implicit-dependency validation issues with multiple finalized copy tasks.
+    dependsOn(tasks.named("copyZipToRoot"))
+    from(new File(project.projectDir, "dist/${project.name}.zip"))
+    into(new File(project.projectDir, "dist"))
+    rename{ _ -> "${project.name}.jar" }
+    doNotTrackState("Copying into dist is a convenience step; state tracking is unnecessary here.")
+}
+
 tasks.register("copyZipToRoot", Copy){
     dependsOn(tasks.named("copyZipToDist"))
     from(tasks.named("jar").flatMap{ it.archiveFile })
@@ -46,7 +56,17 @@ tasks.register("copyZipToRoot", Copy){
     doNotTrackState("Copying into repo root may include locked Gradle cache files; state tracking is unnecessary here.")
 }
 
+tasks.register("copyJarToRoot", Copy){
+    dependsOn(tasks.named("copyJarToDist"))
+    from(new File(project.projectDir, "dist/${project.name}.jar"))
+    into(rootProject.projectDir.parentFile)
+    rename{ _ -> "${project.name}.jar" }
+    doNotTrackState("Copying into repo root may include locked Gradle cache files; state tracking is unnecessary here.")
+}
+
 tasks.named("jar").configure{
     finalizedBy(tasks.named("copyZipToDist"))
     finalizedBy(tasks.named("copyZipToRoot"))
+    finalizedBy(tasks.named("copyJarToDist"))
+    finalizedBy(tasks.named("copyJarToRoot"))
 }
