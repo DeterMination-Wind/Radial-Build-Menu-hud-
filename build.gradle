@@ -3,7 +3,7 @@ plugins{
 }
 
 group = "radialbuildmenu"
-version = "5.1.1"
+version = "5.1.2"
 
 java{
     sourceCompatibility = JavaVersion.VERSION_1_8
