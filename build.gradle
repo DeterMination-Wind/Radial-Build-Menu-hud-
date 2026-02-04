@@ -59,18 +59,17 @@ tasks.register("copyJarToDist", Copy){
 tasks.register("copyZipToRoot", Copy){
     dependsOn(tasks.named("copyZipToDist"))
     from(tasks.named("jar").flatMap{ it.archiveFile })
-    // user requested: put the zip next to "Mindustry-main" (i.e. parent folder of this repo)
-    into(rootProject.projectDir.parentFile)
-    rename{ _ -> "${project.name}.zip" }
-    doNotTrackState("Copying into repo root may include locked Gradle cache files; state tracking is unnecessary here.")
+    into(new File(rootProject.projectDir.parentFile, "构建"))
+    rename{ _ -> "${project.name}-${project.version}.zip" }
+    doNotTrackState("Copying into build output folder is a convenience step; state tracking is unnecessary here.")
 }
 
 tasks.register("copyJarToRoot", Copy){
     dependsOn(tasks.named("copyJarToDist"))
     from(new File(project.projectDir, "dist/${project.name}.jar"))
-    into(rootProject.projectDir.parentFile)
-    rename{ _ -> "${project.name}.jar" }
-    doNotTrackState("Copying into repo root may include locked Gradle cache files; state tracking is unnecessary here.")
+    into(new File(rootProject.projectDir.parentFile, "构建"))
+    rename{ _ -> "${project.name}-${project.version}.jar" }
+    doNotTrackState("Copying into build output folder is a convenience step; state tracking is unnecessary here.")
 }
 
 tasks.named("jar").configure{
