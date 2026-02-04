@@ -19,4 +19,5 @@ jobs:
           artifacts: "dist/radial-build-menu.zip,dist/radial-build-menu.jar"
           allowUpdates: true
           replacesArtifacts: true
+          bodyFile: "CHANGELOG.md"
           draft: false
