@@ -25,6 +25,12 @@ Hold the hotkey to open a radial HUD around your cursor. Release to quickly swit
 
 Put `radial-build-menu.zip` into Mindustry's `mods` folder.
 
+## 安卓 / Android
+
+安卓端需要包含 `classes.dex` 的 mod 包。请下载 Release 中的 `radial-build-menu-android.jar` 并放入 Mindustry 的 `mods` 目录。
+
+Android requires a mod package that contains `classes.dex`. Download `radial-build-menu-android.jar` from Releases and put it into Mindustry's `mods` folder.
+
 ## 构建（在本 Mindustry 源码工程内）/ Build (inside this Mindustry source checkout)
 
 在 `Mindustry-master` 根目录运行：
@@ -36,6 +42,19 @@ From the `Mindustry-master` root directory:
 输出文件 / Output:
 
 `mods/radial-build-menu/build/libs/radial-build-menu.zip`
+
+### 本仓库构建（用于 Release 产物）/ Build from this repo (Release artifacts)
+
+```powershell
+./gradlew.bat jar
+./gradlew.bat jarAndroid
+```
+
+输出 / Output:
+
+- `dist/radial-build-menu.zip`
+- `dist/radial-build-menu.jar`
+- `dist/radial-build-menu-android.jar`
 
 ## 版本号规则 / Versioning
 
