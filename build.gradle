@@ -172,3 +172,13 @@ tasks.register("copyAndroidJarToDist", Copy){
     rename{ _ -> "${project.name}-android.jar" }
     doNotTrackState("Copying into dist is a convenience step; state tracking is unnecessary here.")
 }
+
+// Gradle 8+ validation: dist/ is produced by multiple Copy tasks.
+// Make ordering explicit when producing both desktop and Android artifacts.
+tasks.named("copyJarToDist").configure{
+    mustRunAfter(tasks.named("copyAndroidJarToDist"))
+}
+
+tasks.named("copyJarToRoot").configure{
+    mustRunAfter(tasks.named("copyAndroidJarToDist"))
+}
