@@ -1,5 +1,10 @@
 # RBM / Radial Build Menu — 更新日志
 
+## v5.4.1 (2026-02-08)
+
+### 🐛 修复
+- 🔧 修复 GitHub Actions 构建依赖解析：将 Arc 传递依赖从提交哈希映射到 JitPack 可用版本，避免 release 流水线编译失败。
+
 ## v5.2.0 (2026-02-06)
 
 ### ✨ 改进
