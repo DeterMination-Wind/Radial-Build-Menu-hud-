@@ -162,6 +162,7 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
     }
 
     private void ensureDefaults(){
+        GithubUpdateCheck.applyDefaults();
         Core.settings.defaults(keyEnabled, true);
         Core.settings.defaults(keyHudScale, 100);
         Core.settings.defaults(keyHudAlpha, 100);
@@ -250,6 +251,10 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
 
             table.pref(new HeaderSetting(Core.bundle.get("rbm.section.io"), mindustry.gen.Icon.info));
             table.pref(new IoSetting());
+
+            table.pref(new HeaderSetting(Core.bundle.get("rbm.section.update", "Update"), mindustry.gen.Icon.refresh));
+            table.pref(new IconCheckSetting(GithubUpdateCheck.enabledKey(), true, mindustry.gen.Icon.refresh));
+            table.pref(new IconCheckSetting(GithubUpdateCheck.showDialogKey(), true, mindustry.gen.Icon.info));
         });
     }
 
