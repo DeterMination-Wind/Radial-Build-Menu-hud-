@@ -15,15 +15,16 @@ def arcVersion = (findProperty("arcVersion") ?: mindustryVersion).toString()
 
 repositories{
     mavenCentral()
+    maven{ url = uri("https://maven.xpdustry.com/mindustry") }
     maven{ url "https://jitpack.io" }
 }
 
 configurations.configureEach{
     resolutionStrategy.eachDependency{ details ->
-        // Mindustry v154.3 can request Arc modules by commit hash, but JitPack hosts tag versions.
-        if(details.requested.group == "com.github.Anuken.Arc" && details.requested.version == "ec5df18e54"){
+        // Keep all Arc modules on the same published tag as the selected Mindustry build.
+        if(details.requested.group == "com.github.Anuken.Arc"){
             details.useVersion(arcVersion)
-            details.because("Use JitPack Arc tag artifacts to avoid raw mirror SSL/PKIX dependency")
+            details.because("Resolve Arc modules from the published Mindustry-compatible tag")
         }
     }
 }
@@ -33,8 +34,8 @@ dependencies{
     if(rootProject.findProject(":core") != null){
         compileOnly project(":core")
     }else{
-        // Standalone build: fetch Mindustry core from JitPack.
-        compileOnly "com.github.Anuken.MindustryJitpack:core:$mindustryVersion"
+        // Standalone build: fetch published Mindustry core from a Maven repository that works in CI.
+        compileOnly "com.github.Anuken.Mindustry:core:$mindustryVersion"
     }
 
     def mindustryXClasses = [
