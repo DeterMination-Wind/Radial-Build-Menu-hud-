@@ -1,0 +1,13 @@
+{
+  name: "radial-build-menu"
+  displayName: "圆盘快捷建造 / Radial Build Menu"
+  author: "DeterMination"
+  repo: "DeterMination-Wind/Radial-Build-Menu-hud-"
+  description: "Hold a hotkey to open a radial build HUD around the cursor with configurable 16-slot layouts, profile switching, and rule-based auto slot sets. / 按住热键在鼠标周围打开圆盘建造 HUD，支持 16 槽位配置、配置组切换与规则自动切盘。"
+  version: "5.6.0"
+  minGameVersion: 154
+  hidden: true
+  java: true
+  main: "radialbuildmenu.RadialBuildMenuMod"
+  mainX: "radialbuildmenu.RadialBuildMenuModX"
+}

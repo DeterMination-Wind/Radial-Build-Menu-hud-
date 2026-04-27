@@ -31,6 +31,8 @@ import arc.util.Strings;
 import arc.util.Time;
 import arc.util.serialization.Jval;
 import arc.util.serialization.Jval.Jformat;
+import mdtxcompat.LegacyMindustryXGuard;
+import mdtxcompat.OverlayUiBridge;
 import mindustry.game.EventType.ClientLoadEvent;
 import mindustry.game.EventType.WorldLoadEvent;
 import mindustry.gen.Groups;
@@ -58,6 +60,10 @@ import static mindustry.Vars.mobile;
 import static mindustry.Vars.control;
 
 public class RadialBuildMenuMod extends mindustry.mod.Mod{
+    /** When true, this mod is running as a bundled component inside Neon. */
+    public static boolean bekBundled = false;
+
+
     private static final String overlayName = "rbm-overlay";
     private static final String mobileToggleName = "rbm-mobile-toggle";
     private static final String mobileWindowName = "rbm-mobile";
@@ -72,6 +78,8 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
     private static final String keyEnabled = "rbm-enabled";
     private static final String keyHudScale = "rbm-hudscale";
     private static final String keyHudAlpha = "rbm-hudalpha";
+    private static final String keyPersistentHud = "rbm-persistent-hud";
+    private static final String keyPersistentHudAlpha = "rbm-persistent-hud-alpha";
     private static final String keyInnerRadius = "rbm-inner-radius";
     private static final String keyOuterRadius = "rbm-outer-radius";
     private static final String keyIconScale = "rbm-icon-scale";
@@ -130,8 +138,8 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
     public static final KeyBind radialMenu = KeyBind.add("rbm_radial_menu", KeyCode.unset, "blocks");
     public static final KeyBind toggleSlotGroup = KeyBind.add("rbm_toggle_slot_group", KeyCode.unset, "blocks");
 
-    private final MindustryXOverlayUI xOverlayUi = new MindustryXOverlayUI();
-    private Object xMobileToggleWindow;
+    private final OverlayUiBridge xOverlayUi;
+    private OverlayUiBridge.OverlayWindowHandle xMobileToggleWindow;
 
     private boolean condAfterLatched;
     private boolean condInitActive;
@@ -146,6 +154,11 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
     private static final float condEvalIntervalFrames = 10f;
 
     public RadialBuildMenuMod(){
+        this(vanillaOverlayUi());
+    }
+
+    protected RadialBuildMenuMod(OverlayUiBridge overlayUi){
+        xOverlayUi = overlayUi;
         Events.on(ClientLoadEvent.class, e -> {
             ensureDefaults();
             registerSettings();
@@ -161,11 +174,18 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         });
     }
 
+    private static OverlayUiBridge vanillaOverlayUi(){
+        LegacyMindustryXGuard.rejectLegacyMindustryX("Radial Build Menu");
+        return OverlayUiBridge.UNSUPPORTED;
+    }
+
     private void ensureDefaults(){
         GithubUpdateCheck.applyDefaults();
         Core.settings.defaults(keyEnabled, true);
         Core.settings.defaults(keyHudScale, 100);
         Core.settings.defaults(keyHudAlpha, 100);
+        Core.settings.defaults(keyPersistentHud, false);
+        Core.settings.defaults(keyPersistentHudAlpha, 35);
         Core.settings.defaults(keyInnerRadius, 80);
         Core.settings.defaults(keyOuterRadius, 140);
         Core.settings.defaults(keyIconScale, 100);
@@ -217,8 +237,13 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
 
     private void registerSettings(){
         if(ui == null || ui.settings == null) return;
+        if(bekBundled) return;
 
-        ui.settings.addCategory("@rbm.category", table -> {
+
+        ui.settings.addCategory("@rbm.category", this::bekBuildSettings);
+    }
+    /** Populates a {@link mindustry.ui.dialogs.SettingsMenuDialog.SettingsTable} with this mod's settings. */
+    public void bekBuildSettings(SettingsMenuDialog.SettingsTable table){
             boolean toggleEnabled = Core.settings.getBool(keyToggleSlotGroupsEnabled, false);
 
             table.checkPref(keyEnabled, true);
@@ -230,6 +255,8 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
 
             table.sliderPref(keyHudScale, 100, 50, 200, 5, v -> v + "%");
             table.sliderPref(keyHudAlpha, 100, 0, 100, 5, v -> v + "%");
+            table.checkPref(keyPersistentHud, false);
+            table.sliderPref(keyPersistentHudAlpha, 35, 0, 100, 5, v -> v + "%");
             table.sliderPref(keyInnerRadius, 80, 40, 200, 5, v -> v + "px");
             table.sliderPref(keyOuterRadius, 140, 60, 360, 5, v -> v + "px");
             table.pref(new HudColorSetting());
@@ -249,8 +276,9 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
 
             table.checkPref(GithubUpdateCheck.enabledKey(), true);
             table.checkPref(GithubUpdateCheck.showDialogKey(), true);
-        });
+        
     }
+
 
     void showSlotGroupsDialog(){
         BaseDialog dialog = new BaseDialog("@rbm.slotgroups.title");
@@ -1241,6 +1269,8 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
 
         root.put("hudScale", Core.settings.getInt(keyHudScale, 100));
         root.put("hudAlpha", Core.settings.getInt(keyHudAlpha, 100));
+        root.put("persistentHud", Core.settings.getBool(keyPersistentHud, false));
+        root.put("persistentHudAlpha", Core.settings.getInt(keyPersistentHudAlpha, 35));
         root.put("innerRadius", Core.settings.getInt(keyInnerRadius, 80));
         root.put("outerRadius", Core.settings.getInt(keyOuterRadius, 140));
         root.put("iconScale", Core.settings.getInt(keyIconScale, 100));
@@ -1302,6 +1332,8 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
 
             if(root.has("hudScale")) Core.settings.put(keyHudScale, root.getInt("hudScale", 100));
             if(root.has("hudAlpha")) Core.settings.put(keyHudAlpha, root.getInt("hudAlpha", 100));
+            if(root.has("persistentHud")) Core.settings.put(keyPersistentHud, root.getBool("persistentHud", false));
+            if(root.has("persistentHudAlpha")) Core.settings.put(keyPersistentHudAlpha, Mathf.clamp(root.getInt("persistentHudAlpha", 35), 0, 100));
             if(root.has("innerRadius")) Core.settings.put(keyInnerRadius, root.getInt("innerRadius", 80));
             if(root.has("outerRadius")) Core.settings.put(keyOuterRadius, root.getInt("outerRadius", 140));
             if(root.has("iconScale")) Core.settings.put(keyIconScale, root.getInt("iconScale", 100));
@@ -1380,15 +1412,17 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         ensureOverlayAttached();
 
         // Prefer MindustryX OverlayUI if available.
-        if(xOverlayUi.isInstalled()){
+        if(xOverlayUi.isSupported()){
             if(xMobileToggleWindow == null){
                 try{
                     Table content = buildMobileToggleContent();
                     xMobileToggleWindow = xOverlayUi.registerWindow(mobileWindowName, content, () -> state != null && state.isGame());
-                    if(xMobileToggleWindow != null){
-                        xOverlayUi.configureWindow(xMobileToggleWindow, true, false);
-                        // Auto-enable once, but don't force pinned (allow hiding/closing from OverlayUI).
-                        xOverlayUi.setEnabledAndPinned(xMobileToggleWindow, true, false);
+                    if(xMobileToggleWindow != null && xMobileToggleWindow.asElement() != null){
+                        xMobileToggleWindow.configure(false, true);
+                        // Auto-enable only on first registration; afterwards keep OverlayUI's persisted visibility.
+                        if(!hasStoredOverlayWindowState(mobileWindowName)){
+                            xMobileToggleWindow.setEnabledAndPinned(true, false);
+                        }
                         return;
                     }
                 }catch(Throwable t){
@@ -1410,6 +1444,10 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
             content.setPosition(Core.graphics.getWidth() / 2f, Core.graphics.getHeight() / 2f, Align.center);
             content.toFront();
         });
+    }
+
+    private static boolean hasStoredOverlayWindowState(String windowName){
+        return Core.settings != null && Core.settings.has("overlayUI." + windowName);
     }
 
     private Table buildMobileToggleContent(){
@@ -1561,6 +1599,7 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
                     mod.toggleSlotGroupNow(true);
                 }
                 if(mobile) return;
+                syncPassivePreview();
                 if(canActivate() && Core.input.keyTap(radialMenu)){
                     begin();
                 }
@@ -1572,6 +1611,9 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
 
             // Read settings once, derive all geometry, and precompute slot positions.
             float alpha = parentAlpha * Mathf.clamp(Core.settings.getInt(keyHudAlpha, 100) / 100f);
+            if(!active){
+                alpha *= Mathf.clamp(Core.settings.getInt(keyPersistentHudAlpha, 35) / 100f);
+            }
             float scale = Mathf.clamp(Core.settings.getInt(keyHudScale, 100) / 100f, 0.1f, 5f);
             int innerSetting = Core.settings.getInt(keyInnerRadius, 80);
             int outerSetting = Core.settings.getInt(keyOuterRadius, 140);
@@ -1627,7 +1669,7 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
 
         @Override
         public void draw(){
-            if(!active) return;
+            if(!active && !shouldDrawPassivePreview()) return;
 
             updateLayout();
             HudLayout l = layout;
@@ -1732,6 +1774,35 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
             if(ui.consolefrag != null && ui.consolefrag.shown()) return false;
             if(player == null || player.dead()) return false;
             return state.rules.editor || player.isBuilder();
+        }
+
+        private boolean shouldDrawPassivePreview(){
+            return !mobile
+                && !active
+                && Core.settings.getBool(keyPersistentHud, false)
+                && canActivate();
+        }
+
+        private void syncPassivePreview(){
+            if(!shouldDrawPassivePreview()){
+                hovered = -1;
+                return;
+            }
+
+            if(Core.settings.getBool(keyCenterScreen, false)){
+                centerX = getWidth() / 2f;
+                centerY = getHeight() / 2f;
+            }else{
+                centerX = Core.input.mouseX();
+                centerY = Core.input.mouseY();
+            }
+
+            for(int i = 0; i < slots.length; i++){
+                slots[i] = mod.contextSlotBlock(i);
+            }
+
+            rebuildActiveSlotLists();
+            hovered = -1;
         }
 
         private void begin(){
@@ -1989,120 +2060,6 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
                 && block.placeablePlayer
                 && block.environmentBuildable()
                 && block.supportsEnv(state.rules.env);
-        }
-    }
-
-    /** Optional integration with MindustryX OverlayUI. Uses reflection so vanilla builds won't crash. */
-    private static class MindustryXOverlayUI{
-        private boolean initialized = false;
-        private boolean installed = false;
-        private Object instance;
-        private Method registerWindow;
-        private Method setAvailability;
-        private Method getData;
-        private Method setEnabled;
-        private Method setPinned;
-        private Method setResizable;
-        private Method setAutoHeight;
-
-        boolean isInstalled(){
-            if(initialized) return installed;
-            initialized = true;
-            try{
-                installed = mindustry.Vars.mods != null && mindustry.Vars.mods.locateMod("mindustryx") != null;
-            }catch(Throwable ignored){
-                installed = false;
-            }
-            if(!installed) return false;
-
-            try{
-                Class<?> c = Class.forName("mindustryX.features.ui.OverlayUI");
-                instance = c.getField("INSTANCE").get(null);
-                registerWindow = c.getMethod("registerWindow", String.class, Table.class);
-            }catch(Throwable t){
-                installed = false;
-                Log.err("RBM: MindustryX detected but OverlayUI reflection init failed.", t);
-                return false;
-            }
-            return true;
-        }
-
-        Object registerWindow(String name, Table table, Prov<Boolean> availability){
-            if(!isInstalled()) return null;
-            try{
-                Object window = registerWindow.invoke(instance, name, table);
-                tryInitWindowAccessors(window);
-                if(window != null && availability != null && setAvailability != null){
-                    setAvailability.invoke(window, availability);
-                }
-                return window;
-            }catch(Throwable t){
-                Log.err("RBM: OverlayUI.registerWindow failed.", t);
-                return null;
-            }
-        }
-
-        void configureWindow(Object window, boolean resizable, boolean autoHeight){
-            if(window == null) return;
-            try{
-                tryInitWindowAccessors(window);
-                if(setResizable != null) setResizable.invoke(window, resizable);
-                if(setAutoHeight != null) setAutoHeight.invoke(window, autoHeight);
-            }catch(Throwable ignored){
-            }
-        }
-
-        void setEnabledAndPinned(Object window, boolean enabled, boolean pinned){
-            if(window == null) return;
-            try{
-                tryInitWindowAccessors(window);
-                if(getData == null) return;
-                Object data = getData.invoke(window);
-                if(data == null) return;
-                if(setEnabled != null) setEnabled.invoke(data, enabled);
-                if(pinned && setPinned != null) setPinned.invoke(data, true);
-            }catch(Throwable ignored){
-            }
-        }
-
-        private void tryInitWindowAccessors(Object window){
-            if(window == null) return;
-            if(getData != null || setAvailability != null) return;
-            try{
-                Class<?> wc = window.getClass();
-                try{
-                    setAvailability = wc.getMethod("setAvailability", Prov.class);
-                }catch(Throwable ignored){
-                    setAvailability = null;
-                }
-                try{
-                    setResizable = wc.getMethod("setResizable", boolean.class);
-                }catch(Throwable ignored){
-                    setResizable = null;
-                }
-                try{
-                    setAutoHeight = wc.getMethod("setAutoHeight", boolean.class);
-                }catch(Throwable ignored){
-                    setAutoHeight = null;
-                }
-                getData = wc.getMethod("getData");
-
-                Object data = getData.invoke(window);
-                if(data != null){
-                    Class<?> dc = data.getClass();
-                    try{
-                        setEnabled = dc.getMethod("setEnabled", boolean.class);
-                    }catch(Throwable ignored){
-                        setEnabled = null;
-                    }
-                    try{
-                        setPinned = dc.getMethod("setPinned", boolean.class);
-                    }catch(Throwable ignored){
-                        setPinned = null;
-                    }
-                }
-            }catch(Throwable ignored){
-            }
         }
     }
 

@@ -93,7 +93,7 @@ Hold a hotkey to open a radial HUD near your cursor. Move to a slot and release 
   - Planet overrides (advanced): override profiles per planet (Erekir/Serpulo/Sun)
   - Slot Group A/B (optional): bind a dedicated hotkey to instantly toggle between two groups; when enabled, other rule systems are ignored
   - Conditional switching (advanced): switch profiles using an expression based on match state (time, core items, unit counts, etc.)
-- Highly customizable look: scale, opacity, inner/outer radius, icon scale, background strength, ring opacity/thickness, background color, and an option to center the HUD on screen.
+- Highly customizable look: scale, opacity, passive preview opacity, inner/outer radius, icon scale, background strength, ring opacity/thickness, background color, and an option to center the HUD on screen.
 - Import/Export: backup and share your setup via JSON import/export (copy/paste supported).
 
 ### Quick Start
@@ -103,6 +103,7 @@ Hold a hotkey to open a radial HUD near your cursor. Move to a slot and release 
 2) Configure slots in `Settings → Mods → Radial Build Menu`.
 
 3) Use it: hold the hotkey → move toward a slot / hover an icon → release to confirm.
+4) Optional: enable `Persistent Cursor HUD` to keep a passive HUD near the cursor; while idle it follows the cursor, while held it freezes in place for easier selection.
 
 ### Install
 

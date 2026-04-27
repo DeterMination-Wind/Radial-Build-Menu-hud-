@@ -3,7 +3,7 @@ plugins{
 }
 
 group = "radialbuildmenu"
-version = "5.5.2"
+version = "5.6.0"
 
 java{
     sourceCompatibility = JavaVersion.VERSION_1_8
@@ -35,6 +35,14 @@ dependencies{
     }else{
         // Standalone build: fetch Mindustry core from JitPack.
         compileOnly "com.github.Anuken.MindustryJitpack:core:$mindustryVersion"
+    }
+
+    def mindustryXClasses = [
+        new File(rootDir.parentFile, "MindustryX-main/work/core/build/classes/java/main"),
+        new File(rootDir.parentFile, "MindustryX-main/work/core/build/classes/kotlin/main")
+    ].findAll{ it.exists() }
+    if(!mindustryXClasses.isEmpty()){
+        compileOnly files(mindustryXClasses)
     }
 }
 
