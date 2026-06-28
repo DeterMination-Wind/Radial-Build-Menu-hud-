@@ -3,7 +3,7 @@ plugins{
 }
 
 group = "radialbuildmenu"
-version = "5.6.0"
+version = "5.7.0"
 
 java{
     sourceCompatibility = JavaVersion.VERSION_1_8
@@ -57,6 +57,11 @@ tasks.withType(JavaCompile).configureEach{
 
 jar{
     archiveFileName = "${project.name}.zip"
+    from(projectDir){
+        include "mod.json"
+        include "mod.hjson"
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
 tasks.register("copyZipToDist", Copy){
@@ -186,6 +191,11 @@ tasks.register("jarAndroid", Jar){
         include "classes.dex"
     }
     from(sourceSets.main.output.resourcesDir)
+    from(projectDir){
+        include "mod.json"
+        include "mod.hjson"
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
 tasks.register("copyAndroidJarToDist", Copy){
