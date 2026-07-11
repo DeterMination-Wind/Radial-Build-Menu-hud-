@@ -1,4 +1,10 @@
 # Radial Build Menu / 圆盘快捷建造 (Mindustry Mod)
+<h1 align="center">
+  <a href="https://github.com/DeterMination-Wind/Radial-Build-Menu-hud-/releases/latest"><img src="https://img.shields.io/github/v/release/DeterMination-Wind/Radial-Build-Menu-hud-?display_name=release&label=Latest%20Release&color=green"></a>
+  <a href="https://github.com/DeterMination-Wind/Radial-Build-Menu-hud-/releases"><img src="https://img.shields.io/github/downloads/DeterMination-Wind/Radial-Build-Menu-hud-/total?label=Downloads&color=blue"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/DeterMination-Wind/Radial-Build-Menu-hud-?label=License"></a>
+  <a href="https://github.com/DeterMination-Wind/Radial-Build-Menu-hud-"><img src="https://img.shields.io/github/stars/DeterMination-Wind/Radial-Build-Menu-hud-?style=flat&label=Star%20this%20mod!&color=yellow"></a>
+</h1>
 
 - [中文](#中文)
 - [English](#english)
