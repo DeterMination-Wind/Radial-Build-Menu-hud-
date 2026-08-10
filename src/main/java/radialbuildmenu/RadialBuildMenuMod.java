@@ -578,6 +578,11 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
         return null;
     }
 
+    private boolean shouldPreferContextSlotsForPersistentHud(){
+        return Core.settings.getBool(keyPersistentHud, false)
+            && Core.settings.getBool(keyToggleSlotGroupsEnabled, false);
+    }
+
     private Jval exportWheelProfiles(){
         Jval arr = Jval.newArray();
         for(WheelProfile profile : wheelProfiles){
@@ -2958,7 +2963,7 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
                 centerY = Core.input.mouseY();
             }
 
-            fillSlots(mod.activeWheelProfile());
+            fillSlots(mod.shouldPreferContextSlotsForPersistentHud() ? null : mod.activeWheelProfile());
 
             rebuildActiveSlotLists();
             hovered = -1;
@@ -3000,7 +3005,7 @@ public class RadialBuildMenuMod extends mindustry.mod.Mod{
                 centerY = Core.input.mouseY();
             }
 
-            fillSlots(profile);
+            fillSlots(mod.shouldPreferContextSlotsForPersistentHud() ? null : profile);
 
             rebuildActiveSlotLists();
 

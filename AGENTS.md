@@ -12,7 +12,12 @@ Radial-Build-Menu-hud-/
 |       |-- radialbuildmenu/
 |       \-- mod.json
 |-- docs/
-|   \-- bek-feedback-group.png
+|   |-- bek-feedback-group.png
+|   \-- release-v5.7.0.md
+|-- dist/
+|   |-- radial-build-menu.zip
+|   |-- radial-build-menu.jar
+|   \-- radial-build-menu-android.jar
 |-- gradle/
 |   \-- wrapper/
 |       |-- gradle-wrapper.jar
@@ -29,6 +34,7 @@ Radial-Build-Menu-hud-/
 |-- gradlew
 |-- gradlew.bat
 |-- LICENSE
+|-- mod.hjson
 |-- mod.json
 |-- README.md
 \-- settings.gradle

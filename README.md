@@ -23,10 +23,13 @@
   - 鼠标悬停图标即可选中
   - 可选“方向选择”：当未精确悬停图标时，按鼠标方向选择槽位（支持方向死区、悬停补偿等参数）
 - 多套配置与切换规则：
+  - 轮盘方案：可保存多套 16 槽布局，并为不同方案绑定独立快捷键
   - 基础槽位 + 时长槽位：可设置对局达到 X 分钟后切换到“时长槽位”
   - 星球覆盖（高级）：可按星球（Erekir/Serpulo/Sun）覆盖基础/时长槽位
   - 槽位组 A/B（可选）：启用后可用独立热键在 A/B 两组之间即时切换；启用后会忽略“时长/星球/条件”规则，只使用这两组
+  - 自动槽位组：按条件表达式自动切换槽位内容（支持 `planet`、`@thisteam`、队伍名、`blue.copper`/`blue.poly` 等变量写法）
   - 条件切换（高级）：使用表达式按对局条件切换槽位（例如按时间、核心物资、单位数量等）
+- He 快捷栏同步（可选）：开启后圆盘实时镜像 Helium 当前可见的快捷栏页。
 - 外观高度可调：HUD 缩放、透明度、内外圈半径、图标缩放、背景强度、圆环透明度/粗细、背景颜色；可选“HUD 始终居中”。
 - 导入/导出：配置支持 JSON 导入/导出（含复制粘贴），方便备份与分享。
 
@@ -95,10 +98,13 @@ Hold a hotkey to open a radial HUD near your cursor. Move to a slot and release 
   - Hover an icon to select it
   - Optional direction selection when you are not precisely hovering (with configurable deadzone / hover padding)
 - Multiple profiles and switching rules:
+  - Wheel Profiles: save multiple 16-slot layouts and bind each profile to its own hotkey
   - Base slots + Time slots: switch to a different profile after X minutes
   - Planet overrides (advanced): override profiles per planet (Erekir/Serpulo/Sun)
   - Slot Group A/B (optional): bind a dedicated hotkey to instantly toggle between two groups; when enabled, other rule systems are ignored
+  - Auto Slot Groups: switch slot sets automatically via condition expressions (supports `planet`, `@thisteam`, team names, and values like `blue.copper` / `blue.poly`)
   - Conditional switching (advanced): switch profiles using an expression based on match state (time, core items, unit counts, etc.)
+- He fast-slot sync (optional): the radial menu mirrors Helium's currently visible fast-slot page in real time.
 - Highly customizable look: scale, opacity, passive preview opacity, inner/outer radius, icon scale, background strength, ring opacity/thickness, background color, and an option to center the HUD on screen.
 - Import/Export: backup and share your setup via JSON import/export (copy/paste supported).
 
