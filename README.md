@@ -50,3 +50,7 @@ Put radial-build-menu.zip or radial-build-menu.jar in Mindustry's mods directory
 .\gradlew.bat jar
 .\gradlew.bat jarAndroid
 ~~~
+
+## 文档
+
+开发与维护文档见 [docs/README.md](docs/README.md)：架构总览、开发指南、版本与发布、测试指南、术语表。玩家向的功能说明见 [DOC.md](DOC.md)，逐版本变更见 [CHANGELOG.md](CHANGELOG.md)。
